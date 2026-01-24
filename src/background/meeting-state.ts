@@ -269,8 +269,9 @@ export async function resetMeetingState(): Promise<void> {
 /**
  * Initialize meeting state module
  * Should be called on service worker startup
+ * Returns the number of stale tabs that were cleaned up (for crash recovery)
  */
-export async function initializeMeetingState(): Promise<void> {
+export async function initializeMeetingState(): Promise<number> {
   console.log('[MeetingState] Initializing...');
 
   // Load state from storage
@@ -284,4 +285,6 @@ export async function initializeMeetingState(): Promise<void> {
 
   const state = await loadState();
   console.log(`[MeetingState] Initialized with ${state.activeTabs.length} active tabs`);
+
+  return staleCount;
 }

@@ -23,6 +23,8 @@ import {
   hasActiveMeetings,
   getActiveMeetingCount,
   initializeMeetingState,
+  getActiveMeetingTabs,
+  isInMeetingMode,
 } from './meeting-state';
 
 console.log('[Background] Service worker started');
@@ -217,6 +219,86 @@ async function handleTabUpdated(tabId: number, changeInfo: chrome.tabs.TabChange
   }
 }
 
+/**
+ * Handle window close - check if any meeting tabs were in that window
+ */
+async function handleWindowClosed(windowId: number): Promise<void> {
+  console.log(`[Background] Window ${windowId} closed`);
+
+  // Get all active meeting tabs
+  const meetingTabs = await getActiveMeetingTabs();
+  if (meetingTabs.length === 0) {
+    return;
+  }
+
+  // Find tabs that were in the closed window (they will no longer exist)
+  // Since the window is closed, we can't query which tabs were in it
+  // Instead, we'll verify which tracked tabs still exist
+  const tabsToRemove: number[] = [];
+
+  for (const tab of meetingTabs) {
+    try {
+      await chrome.tabs.get(tab.tabId);
+      // Tab still exists, it wasn't in the closed window
+    } catch {
+      // Tab doesn't exist anymore, was in the closed window
+      tabsToRemove.push(tab.tabId);
+    }
+  }
+
+  if (tabsToRemove.length === 0) {
+    return;
+  }
+
+  console.log(`[Background] Found ${tabsToRemove.length} meeting tab(s) in closed window`);
+
+  // Process each closed tab
+  for (const tabId of tabsToRemove) {
+    await handleMeetingLeft(tabId);
+  }
+}
+
+/**
+ * Handle browser restart/crash recovery
+ * Called during initialization if there were stale meeting tabs
+ */
+async function handleCrashRecovery(staleTabCount: number): Promise<void> {
+  if (staleTabCount === 0) {
+    return;
+  }
+
+  console.log(`[Background] Browser crash recovery: ${staleTabCount} stale tabs detected`);
+
+  // Check if we were in meeting mode (status was changed)
+  const inMeetingMode = await isInMeetingMode();
+  if (!inMeetingMode) {
+    console.log('[Background] No active meeting mode, skipping status restoration');
+    return;
+  }
+
+  // Check if there are any remaining active meetings after cleanup
+  const hasRemaining = await hasActiveMeetings();
+  if (hasRemaining) {
+    console.log('[Background] Still have active meetings, keeping current status');
+    return;
+  }
+
+  // No active meetings left, restore Zoom status
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    console.log('[Background] Not authenticated, skipping status restoration');
+    return;
+  }
+
+  try {
+    console.log('[Background] Restoring Zoom status after crash recovery');
+    const restoredStatus = await restorePreviousStatus();
+    console.log(`[Background] Zoom status restored to: ${restoredStatus}`);
+  } catch (error) {
+    console.error('[Background] Failed to restore Zoom status after crash:', error);
+  }
+}
+
 // ============================================
 // Message Handler
 // ============================================
@@ -362,7 +444,11 @@ async function initialize(): Promise<void> {
 
   try {
     // Initialize meeting state (loads from storage, cleans up stale tabs)
-    await initializeMeetingState();
+    // Returns number of stale tabs that were cleaned up
+    const staleTabCount = await initializeMeetingState();
+
+    // Handle crash recovery if we had stale tabs
+    await handleCrashRecovery(staleTabCount);
 
     // Initialize auth module (restores refresh timer)
     await initializeAuth();
@@ -396,6 +482,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Listen for tab URL changes (to detect navigation away from Meet)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   handleTabUpdated(tabId, changeInfo).catch(console.error);
+});
+
+// Listen for window removal (to detect closed windows with meeting tabs)
+chrome.windows.onRemoved.addListener((windowId) => {
+  handleWindowClosed(windowId).catch(console.error);
 });
 
 // Initialize immediately in case service worker is starting fresh
