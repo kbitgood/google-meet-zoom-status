@@ -119,3 +119,44 @@ Parent Task: google-meet-zoom-status
 0781722 - feat(P0-3): Implement Google Meet Detection Content Script
 
 ---
+
+## 2026-01-24 00:46 - P0-3: Implement Google Meet Detection Content Script
+- Completed by Ralph
+---
+
+## P0-4: Document Zoom OAuth App Setup
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `docs/ZOOM_OAUTH_SETUP.md` with comprehensive documentation:
+  - Step-by-step guide to getting Chrome extension ID
+  - Detailed Zoom App Marketplace app creation instructions
+  - App information configuration (name, description, etc.)
+  - OAuth credentials explanation (Client ID, Client Secret)
+  - Redirect URI format: `https://<EXTENSION_ID>.chromiumapp.org/`
+  - Required scopes documented: `user:read`, `user:write`
+  - Troubleshooting section for common errors
+  - Security best practices
+  - API rate limit information
+  - Reference links to Zoom and Chrome documentation
+
+- Created `src/config.example.ts` with:
+  - TypeScript interface `ZoomConfig` for type safety
+  - `ZOOM_SCOPES` constant with required OAuth scopes
+  - `ZOOM_API` constant with API endpoints (baseUrl, authUrl, tokenUrl)
+  - `ZOOM_CONFIG` template with placeholder values
+  - Inline documentation explaining each field
+
+### Files created:
+- `docs/ZOOM_OAUTH_SETUP.md` - Full setup guide (non-developer friendly)
+- `src/config.example.ts` - Configuration template with types
+
+### Verification:
+- `npm run typecheck` - SUCCESS
+- `npm run build` - SUCCESS
+
+### Commit:
+aab9f28 - feat(P0-4): Document Zoom OAuth App Setup
+
+---
