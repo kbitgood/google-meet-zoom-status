@@ -1,0 +1,20 @@
+{
+  "name": "google-meet-zoom-status",
+  "version": "1.0.0",
+  "description": "Chrome extension that automatically updates your Zoom presence status when you join/leave Google Meet calls",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "build:watch": "node build.js --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
