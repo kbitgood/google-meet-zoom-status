@@ -160,3 +160,81 @@ Parent Task: google-meet-zoom-status
 aab9f28 - feat(P0-4): Document Zoom OAuth App Setup
 
 ---
+
+## 2026-01-24 00:48 - P0-4: Document Zoom OAuth App Setup
+- Completed by Ralph
+---
+
+## P0-5: Implement Zoom OAuth Authentication Flow
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `src/utils/storage.ts` with Chrome storage helpers:
+  - Type-safe wrappers around `chrome.storage.local`
+  - `getZoomToken()` / `saveZoomToken()` / `removeZoomToken()` - Token CRUD
+  - `isZoomTokenValid()` - Check if token is valid (5 min buffer)
+  - `shouldRefreshZoomToken()` - Check if token needs refresh (10 min buffer)
+  - `getMeetingState()` / `saveMeetingState()` / `clearMeetingState()` - Meeting state
+  - `getSettings()` / `saveSettings()` / `resetSettings()` - Extension settings
+  - `onStorageChange()` / `removeStorageChangeListener()` - Storage events
+
+- Created `src/background/zoom-auth.ts` with full OAuth 2.0 flow:
+  - `ZoomAuthError` class with error codes: USER_CANCELLED, NETWORK_ERROR, TOKEN_ERROR, INVALID_RESPONSE, UNKNOWN
+  - `buildAuthorizationUrl()` - Constructs OAuth URL with scopes
+  - `extractAuthorizationCode()` - Parses callback URL for code/errors
+  - `exchangeCodeForTokens()` - POST to /oauth/token with Basic auth
+  - `refreshAccessToken()` - Token refresh using refresh_token grant
+  - `fetchUserId()` - GET /users/me to get user ID
+  - `scheduleTokenRefresh()` - Sets timeout to refresh 5 min before expiry
+  - `performTokenRefresh()` - Executes refresh and updates storage
+  - `initiateOAuthFlow()` - Uses `chrome.identity.launchWebAuthFlow`
+  - `disconnect()` - Clears tokens and cancels refresh timer
+  - `getValidAccessToken()` - Returns valid token, refreshing if needed
+  - `isAuthenticated()` - Check if user has valid tokens
+  - `getAuthenticatedUserId()` - Get stored user ID
+  - `initializeAuth()` - Restore refresh timer on service worker start
+
+- Updated `src/background/index.ts`:
+  - Refactored to use async message handler pattern
+  - Added `CONNECT_ZOOM` message handler - initiates OAuth flow
+  - Added `DISCONNECT_ZOOM` message handler - clears tokens
+  - `GET_AUTH_STATUS` now returns actual auth state
+  - Calls `initializeAuth()` on install, startup, and immediately
+
+- Updated `src/types.ts`:
+  - Added `CONNECT_ZOOM` and `DISCONNECT_ZOOM` message types
+  - Added `AuthOperationResponse` interface with success/error/errorCode
+
+- Updated `public/manifest.json`:
+  - Added `https://zoom.us/*` host permission for OAuth token endpoint
+
+- Updated `.gitignore`:
+  - Added `src/config.ts` to prevent committing secrets
+
+### Files created:
+- `src/utils/storage.ts` - Chrome storage helper utilities
+- `src/background/zoom-auth.ts` - Zoom OAuth authentication module
+
+### Files modified:
+- `src/background/index.ts` - Integrated auth handlers
+- `src/types.ts` - Added auth message types
+- `public/manifest.json` - Added zoom.us host permission
+- `.gitignore` - Added config.ts
+
+### Acceptance criteria verification:
+- [x] "Connect to Zoom" initiates OAuth flow (CONNECT_ZOOM message)
+- [x] OAuth popup opens via chrome.identity.launchWebAuthFlow
+- [x] Authorization code captured from callback URL
+- [x] Access and refresh tokens stored in chrome.storage.local
+- [x] Token refresh scheduled before expiry (5 min buffer)
+- [x] "Disconnect" clears stored tokens (DISCONNECT_ZOOM message)
+- [x] Errors handled: user cancels, network error, token errors
+- [x] `npm run typecheck` - SUCCESS
+- [x] `npm run build` - SUCCESS
+
+### Commit:
+93b0312 - feat(P0-5): Implement Zoom OAuth Authentication Flow
+
+---
+
