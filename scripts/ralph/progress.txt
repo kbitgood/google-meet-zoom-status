@@ -356,3 +356,46 @@ aab9f28 - feat(P0-4): Document Zoom OAuth App Setup
 6dde0dc - feat(P0-7): Implement Background Service Worker Logic
 
 ---
+
+## 2026-01-24 01:06 - P0-7: Implement Background Service Worker Logic
+- Completed by Ralph
+---
+
+## P0-8: Handle Tab and Window Close Events
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Added `chrome.windows.onRemoved` listener for window close events:
+  - `handleWindowClosed()` function to detect meeting tabs in closed windows
+  - Verifies which tracked tabs still exist after window close
+  - Processes all affected tabs as meeting left events
+
+- Enhanced browser crash recovery with status restoration:
+  - `handleCrashRecovery()` function called during initialization
+  - Modified `initializeMeetingState()` to return stale tab count
+  - Restores Zoom status if user was in meeting mode before crash
+  - Checks `isInMeetingMode()` to determine if status needs restoration
+
+- Tab close already handled by P0-7 (`chrome.tabs.onRemoved`)
+
+### Files modified:
+- `src/background/index.ts` - Added window close handler, crash recovery, imports
+- `src/background/meeting-state.ts` - Changed initializeMeetingState return type
+
+### Acceptance criteria verification:
+- [x] Status resets when Meet tab is closed during meeting - via `chrome.tabs.onRemoved` (P0-7)
+- [x] Status resets when browser window is closed during meeting - via `chrome.windows.onRemoved`
+- [x] Multiple tabs handled correctly (only reset on last tab close) - via `getActiveMeetingTabs()` tracking
+- [x] State recovered after browser restart - via `handleCrashRecovery()` with `initializeMeetingState()`
+- [x] `npm run typecheck` - SUCCESS
+- [x] `npm run build` - SUCCESS
+
+### Commit:
+add6b64 - feat(P0-8): Handle Tab and Window Close Events
+
+---
+
+## 2026-01-24 - P0-8: Handle Tab and Window Close Events
+- Completed by Ralph
+---
