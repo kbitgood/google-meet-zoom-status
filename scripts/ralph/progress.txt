@@ -294,3 +294,65 @@ aab9f28 - feat(P0-4): Document Zoom OAuth App Setup
 ## 2026-01-24 - P0-6: Implement Zoom Presence Status API Integration
 - Completed by Ralph
 ---
+
+## 2026-01-24 01:03 - P0-6: Implement Zoom Presence Status API Integration
+- Completed by Ralph
+---
+
+## P0-7: Implement Background Service Worker Logic
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `src/background/meeting-state.ts` for tracking active meeting tabs:
+  - `ActiveMeetingTab` interface for tracking tab info (tabId, meetingId, joinedAt)
+  - `MeetingStateData` interface for persisted state (activeTabs, previousZoomStatus, statusChangedAt)
+  - In-memory cache with chrome.storage.local persistence for service worker restarts
+  - `addMeetingTab()` - Add tab, returns true if first meeting
+  - `removeMeetingTab()` - Remove tab, returns true if was last meeting
+  - `isTabInMeeting()` - Check if a specific tab is in meeting
+  - `getActiveMeetingTabs()` - Get all active meeting tabs
+  - `getActiveMeetingCount()` - Get count of active tabs
+  - `hasActiveMeetings()` - Quick check if any meetings active
+  - `savePreviousZoomStatus()` / `getPreviousZoomStatus()` / `clearPreviousZoomStatus()` - Track Zoom status
+  - `cleanupStaleTabs()` - Remove tabs that no longer exist (for recovery)
+  - `resetMeetingState()` - Full state reset
+  - `initializeMeetingState()` - Startup initialization with stale tab cleanup
+
+- Updated `src/background/index.ts` with full service worker logic:
+  - Badge management with three states: disconnected (gray), connected (green), in_meeting (red with "MTG")
+  - `handleMeetingJoined()` - Process MEETING_JOINED messages:
+    - Add tab to tracking
+    - If first meeting: Call `setDoNotDisturb(240)` (4 hour duration)
+    - Update badge to show "MTG" in red
+  - `handleMeetingLeft()` - Process MEETING_LEFT messages:
+    - Remove tab from tracking
+    - If last meeting: Call `restorePreviousStatus()`
+    - Update badge back to green/gray
+  - Tab event listeners:
+    - `chrome.tabs.onRemoved` - Handle tab close as meeting left
+    - `chrome.tabs.onUpdated` - Handle navigation away from Meet as meeting left
+  - Updated `handleConnectZoom()` / `handleDisconnectZoom()` to update badge on auth changes
+  - Unified `initialize()` function called on install, startup, and immediate load
+  - All state persists to chrome.storage.local for service worker restart recovery
+
+### Files created:
+- `src/background/meeting-state.ts` - Meeting state management module (243 lines)
+
+### Files modified:
+- `src/background/index.ts` - Complete rewrite with meeting handling logic (303 lines)
+
+### Acceptance criteria verification:
+- [x] Receives and processes content script messages (MEETING_JOINED, MEETING_LEFT)
+- [x] Updates Zoom status on meeting join - `setDoNotDisturb(240)` called on first meeting
+- [x] Restores Zoom status on meeting leave - `restorePreviousStatus()` called on last meeting leave
+- [x] Tracks multiple Meet tabs correctly - activeTabs array in MeetingStateData
+- [x] State persists across service worker restarts - chrome.storage.local persistence
+- [x] Badge icon updates to reflect state - gray=disconnected, green=connected, red+MTG=in_meeting
+- [x] `npm run typecheck` - SUCCESS
+- [x] `npm run build` - SUCCESS
+
+### Commit:
+6dde0dc - feat(P0-7): Implement Background Service Worker Logic
+
+---
