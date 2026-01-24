@@ -12,42 +12,235 @@ import {
   initializeAuth,
   ZoomAuthError,
 } from './zoom-auth';
+import {
+  setDoNotDisturb,
+  restorePreviousStatus,
+  ZoomApiError,
+} from './zoom-api';
+import {
+  addMeetingTab,
+  removeMeetingTab,
+  hasActiveMeetings,
+  getActiveMeetingCount,
+  initializeMeetingState,
+} from './meeting-state';
 
 console.log('[Background] Service worker started');
 
-// Handle messages from content scripts and popup
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
-  // Handle async operations
-  handleMessage(message)
-    .then(sendResponse)
-    .catch((error) => {
-      console.error('[Background] Message handling error:', error);
-      sendResponse({ success: false, error: error.message });
-    });
+// ============================================
+// Badge Management
+// ============================================
 
-  // Return true to indicate async response
-  return true;
-});
+type BadgeState = 'disconnected' | 'connected' | 'in_meeting';
+
+const BADGE_COLORS: Record<BadgeState, string> = {
+  disconnected: '#808080', // Gray
+  connected: '#22C55E',    // Green
+  in_meeting: '#EF4444',   // Red
+};
+
+const BADGE_TEXT: Record<BadgeState, string> = {
+  disconnected: '',
+  connected: '',
+  in_meeting: 'MTG',
+};
+
+/**
+ * Update the extension badge to reflect current state
+ */
+async function updateBadge(): Promise<void> {
+  let state: BadgeState = 'disconnected';
+
+  const authenticated = await isAuthenticated();
+  if (authenticated) {
+    const inMeeting = await hasActiveMeetings();
+    state = inMeeting ? 'in_meeting' : 'connected';
+  }
+
+  await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS[state] });
+  await chrome.action.setBadgeText({ text: BADGE_TEXT[state] });
+
+  console.log(`[Background] Badge updated to: ${state}`);
+}
+
+// ============================================
+// Meeting Event Handlers
+// ============================================
+
+/**
+ * Handle when a user joins a meeting
+ */
+async function handleMeetingJoined(tabId: number, meetingId?: string): Promise<{ success: boolean; error?: string }> {
+  console.log(`[Background] Processing MEETING_JOINED for tab ${tabId}, meetingId: ${meetingId}`);
+
+  const isFirstMeeting = await addMeetingTab(tabId, meetingId);
+
+  // Update badge immediately
+  await updateBadge();
+
+  // Only update Zoom status if this is the first meeting
+  if (!isFirstMeeting) {
+    console.log('[Background] Already in a meeting, skipping Zoom status update');
+    return { success: true };
+  }
+
+  // Check if authenticated before trying to update status
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    console.log('[Background] Not authenticated, skipping Zoom status update');
+    return { success: true };
+  }
+
+  try {
+    // Set Zoom status to Do Not Disturb
+    // Use 240 minutes (4 hours) as a reasonable meeting duration
+    const previousStatus = await setDoNotDisturb(240);
+    console.log(`[Background] Zoom status changed to Do_Not_Disturb (was: ${previousStatus})`);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Background] Failed to update Zoom status:', error);
+
+    if (error instanceof ZoomApiError) {
+      return {
+        success: false,
+        error: `Zoom API error: ${error.message}`,
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Handle when a user leaves a meeting
+ */
+async function handleMeetingLeft(tabId: number): Promise<{ success: boolean; error?: string }> {
+  console.log(`[Background] Processing MEETING_LEFT for tab ${tabId}`);
+
+  const wasLastMeeting = await removeMeetingTab(tabId);
+
+  // Update badge immediately
+  await updateBadge();
+
+  // Only restore Zoom status if this was the last meeting
+  if (!wasLastMeeting) {
+    const count = await getActiveMeetingCount();
+    console.log(`[Background] Still in ${count} meeting(s), skipping Zoom status restore`);
+    return { success: true };
+  }
+
+  // Check if authenticated before trying to restore status
+  const authenticated = await isAuthenticated();
+  if (!authenticated) {
+    console.log('[Background] Not authenticated, skipping Zoom status restore');
+    return { success: true };
+  }
+
+  try {
+    // Restore previous Zoom status
+    const restoredStatus = await restorePreviousStatus();
+    console.log(`[Background] Zoom status restored to: ${restoredStatus}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error('[Background] Failed to restore Zoom status:', error);
+
+    if (error instanceof ZoomApiError) {
+      return {
+        success: false,
+        error: `Zoom API error: ${error.message}`,
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+// ============================================
+// Tab Event Handlers
+// ============================================
+
+/**
+ * Handle tab close - treat as meeting left
+ */
+async function handleTabClosed(tabId: number): Promise<void> {
+  console.log(`[Background] Tab ${tabId} closed`);
+
+  // Remove the tab and update status if needed
+  const wasLastMeeting = await removeMeetingTab(tabId);
+
+  if (wasLastMeeting) {
+    console.log('[Background] Last meeting tab closed, restoring Zoom status');
+
+    // Update badge
+    await updateBadge();
+
+    // Restore status if authenticated
+    const authenticated = await isAuthenticated();
+    if (authenticated) {
+      try {
+        const restoredStatus = await restorePreviousStatus();
+        console.log(`[Background] Zoom status restored to: ${restoredStatus}`);
+      } catch (error) {
+        console.error('[Background] Failed to restore Zoom status on tab close:', error);
+      }
+    }
+  }
+}
+
+/**
+ * Handle tab URL change - if navigating away from Meet, treat as meeting left
+ */
+async function handleTabUpdated(tabId: number, changeInfo: chrome.tabs.TabChangeInfo): Promise<void> {
+  // Only care about URL changes
+  if (!changeInfo.url) {
+    return;
+  }
+
+  // Check if this tab was in a meeting
+  const wasInMeeting = await hasActiveMeetings();
+  if (!wasInMeeting) {
+    return;
+  }
+
+  // Check if the new URL is still a Meet page
+  if (!changeInfo.url.includes('meet.google.com')) {
+    console.log(`[Background] Tab ${tabId} navigated away from Meet`);
+    await handleMeetingLeft(tabId);
+  }
+}
+
+// ============================================
+// Message Handler
+// ============================================
 
 /**
  * Handle messages asynchronously
  */
-async function handleMessage(message: ExtensionMessage): Promise<unknown> {
+async function handleMessage(message: ExtensionMessage, sender: chrome.runtime.MessageSender): Promise<unknown> {
+  // Get tab ID from sender if available
+  const tabId = sender.tab?.id ?? 0;
+
   switch (message.type) {
     case 'MEETING_JOINED':
-      console.log('[Background] Meeting joined:', message.meetingId);
-      // TODO: Update Zoom status to Do_Not_Disturb
-      return { success: true };
+      return handleMeetingJoined(message.tabId || tabId, message.meetingId);
 
     case 'MEETING_LEFT':
-      console.log('[Background] Meeting left');
-      // TODO: Update Zoom status to Available
-      return { success: true };
+      return handleMeetingLeft(message.tabId || tabId);
 
     case 'GET_MEETING_STATE':
-      // TODO: Return actual meeting state from storage
+      const inMeeting = await hasActiveMeetings();
+      const meetingCount = await getActiveMeetingCount();
       const stateResponse: MeetingStateResponse = {
-        isInMeeting: false,
+        isInMeeting: inMeeting,
+        meetingId: meetingCount > 0 ? `${meetingCount} active` : undefined,
       };
       return stateResponse;
 
@@ -65,6 +258,24 @@ async function handleMessage(message: ExtensionMessage): Promise<unknown> {
       return { success: false, error: 'Unknown message type' };
   }
 }
+
+// Handle messages from content scripts and popup
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  // Handle async operations
+  handleMessage(message, sender)
+    .then(sendResponse)
+    .catch((error) => {
+      console.error('[Background] Message handling error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+
+  // Return true to indicate async response
+  return true;
+});
+
+// ============================================
+// Auth Handlers
+// ============================================
 
 /**
  * Handle GET_AUTH_STATUS message
@@ -87,6 +298,9 @@ async function handleConnectZoom(): Promise<AuthOperationResponse> {
     console.log('[Background] Starting Zoom OAuth flow...');
     const tokenData = await initiateOAuthFlow();
     console.log('[Background] Zoom OAuth successful, user:', tokenData.userId);
+
+    // Update badge after successful connection
+    await updateBadge();
 
     return {
       success: true,
@@ -119,6 +333,9 @@ async function handleDisconnectZoom(): Promise<AuthOperationResponse> {
     await disconnect();
     console.log('[Background] Disconnected from Zoom');
 
+    // Update badge after disconnect
+    await updateBadge();
+
     return {
       success: true,
     };
@@ -133,19 +350,53 @@ async function handleDisconnectZoom(): Promise<AuthOperationResponse> {
   }
 }
 
+// ============================================
+// Service Worker Lifecycle
+// ============================================
+
+/**
+ * Initialize the service worker
+ */
+async function initialize(): Promise<void> {
+  console.log('[Background] Initializing service worker...');
+
+  try {
+    // Initialize meeting state (loads from storage, cleans up stale tabs)
+    await initializeMeetingState();
+
+    // Initialize auth module (restores refresh timer)
+    await initializeAuth();
+
+    // Update badge to reflect current state
+    await updateBadge();
+
+    console.log('[Background] Service worker initialized successfully');
+  } catch (error) {
+    console.error('[Background] Service worker initialization failed:', error);
+  }
+}
+
 // Handle extension installation/update
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('[Background] Extension installed/updated:', details.reason);
-  // Initialize auth module after installation
-  initializeAuth().catch(console.error);
+  initialize().catch(console.error);
 });
 
 // Handle service worker startup
 chrome.runtime.onStartup.addListener(() => {
   console.log('[Background] Service worker started up');
-  // Initialize auth module on startup (restore refresh timer)
-  initializeAuth().catch(console.error);
+  initialize().catch(console.error);
 });
 
-// Initialize auth immediately in case service worker is starting fresh
-initializeAuth().catch(console.error);
+// Listen for tab removal (to detect closed meeting tabs)
+chrome.tabs.onRemoved.addListener((tabId) => {
+  handleTabClosed(tabId).catch(console.error);
+});
+
+// Listen for tab URL changes (to detect navigation away from Meet)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  handleTabUpdated(tabId, changeInfo).catch(console.error);
+});
+
+// Initialize immediately in case service worker is starting fresh
+initialize().catch(console.error);
