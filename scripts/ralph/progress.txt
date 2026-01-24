@@ -6,4 +6,41 @@ Parent Task: google-meet-zoom-status
 ## Codebase Patterns
 (Patterns discovered during this feature build)
 
+- TypeScript with ES2022 target and strict mode
+- esbuild for bundling (not webpack/vite)
+- Chrome extension Manifest V3 structure
+- Entry points: background/index.ts, content/index.ts, popup/index.ts
+- Shared types in src/types.ts
+
 ---
+
+## P0-1: Initialize Project Structure
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `package.json` with scripts: build, build:watch, typecheck
+- Dependencies: esbuild, typescript, @types/chrome
+- Created `tsconfig.json` with strict TypeScript settings (ES2022, bundler resolution)
+- Created `build.js` using esbuild to bundle 3 entry points to dist/
+- Created directory structure:
+  - `src/background/index.ts` - Service worker entry
+  - `src/content/index.ts` - Content script entry
+  - `src/popup/index.ts` - Popup script entry
+  - `src/types.ts` - Shared TypeScript types (ZoomPresenceStatus, MeetingState, ExtensionMessage, etc.)
+  - `public/manifest.json` - Chrome extension manifest v3
+  - `public/popup.html` - Popup HTML
+  - `public/popup.css` - Popup styles
+  - `public/icons/` - Placeholder icons (16, 48, 128)
+- Created `.gitignore` for node_modules, dist, env files
+
+### Verification:
+- `npm install` - SUCCESS
+- `npm run build` - SUCCESS (creates dist/ with bundled files)
+- `npm run typecheck` - SUCCESS (no errors)
+
+### Commit:
+05bdc1e - feat(P0-1): Initialize Project Structure
+
+---
+
