@@ -238,3 +238,59 @@ aab9f28 - feat(P0-4): Document Zoom OAuth App Setup
 
 ---
 
+
+## 2026-01-24 00:52 - P0-5: Implement Zoom OAuth Authentication Flow
+- Completed by Ralph
+---
+
+## P0-6: Implement Zoom Presence Status API Integration
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `src/background/zoom-api.ts` with full Zoom API integration:
+  - `ZoomApiError` class with error codes: UNAUTHORIZED, RATE_LIMITED, NOT_FOUND, FORBIDDEN, NETWORK_ERROR, INVALID_RESPONSE, NOT_AUTHENTICATED, UNKNOWN
+  - `ZoomApiErrorCode` type for type-safe error handling
+  - `ZoomPresenceStatusResponse` interface for API response
+  - `ZoomUserInfo` interface for user data
+  - Retry configuration with exponential backoff and jitter
+  - `calculateBackoffDelay()` - Exponential backoff with 0-30% jitter
+  - `makeApiRequest<T>()` - Generic authenticated request handler with retry logic
+  - `getCurrentUser()` - GET /v2/users/me to fetch user info
+  - `getCurrentUserId()` - Get user ID (cached or from API)
+  - `getPresenceStatus()` - GET /v2/users/{userId}/presence_status
+  - `updatePresenceStatus()` - PUT /v2/users/{userId}/presence_status
+  - `setDoNotDisturb()` - Set DND and save previous status
+  - `restorePreviousStatus()` - Restore to previous or Available
+  - `setAvailable()` - Convenience function for Available status
+  - `setAway()` - Convenience function for Away status
+
+### Error Handling:
+- 401 errors: Handled via `getValidAccessToken()` which refreshes if needed
+- 429 rate limit: Respects Retry-After header, falls back to exponential backoff
+- Network errors: Wrapped in `ZoomApiError` with NETWORK_ERROR code
+- Retryable errors: RATE_LIMITED and NETWORK_ERROR (up to 3 retries)
+- Non-retryable: UNAUTHORIZED, FORBIDDEN, NOT_FOUND thrown immediately
+
+### Files created:
+- `src/background/zoom-api.ts` - Zoom presence API module (407 lines)
+
+### Acceptance criteria verification:
+- [x] Can fetch current user ID - `getCurrentUserId()` and `getCurrentUser()`
+- [x] Can fetch current presence status - `getPresenceStatus()`
+- [x] Can update status to "Do_Not_Disturb" with custom message - `setDoNotDisturb(duration)`
+- [x] Can restore previous status - `restorePreviousStatus()`
+- [x] 401 errors trigger token refresh - via `getValidAccessToken()` in each request
+- [x] 429 errors are handled with backoff - Retry-After + exponential backoff
+- [x] Network errors are caught and reported - ZoomApiError with NETWORK_ERROR
+- [x] `npm run typecheck` - SUCCESS
+- [x] `npm run build` - SUCCESS
+
+### Commit:
+36c9bcf - feat(P0-6): Implement Zoom Presence Status API Integration
+
+---
+
+## 2026-01-24 - P0-6: Implement Zoom Presence Status API Integration
+- Completed by Ralph
+---
