@@ -9,6 +9,9 @@ dist/
 .env.local
 .env.*.local
 
+# Config with secrets (use config.example.ts as template)
+src/config.ts
+
 # IDE
 .idea/
 .vscode/
