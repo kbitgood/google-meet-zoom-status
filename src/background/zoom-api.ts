@@ -6,6 +6,7 @@
 import { ZOOM_API } from '../config';
 import type { ZoomPresenceStatus } from '../types';
 import { getValidAccessToken, getAuthenticatedUserId } from './zoom-auth';
+import { zoomApiLogger as logger } from '../utils/logger';
 
 // ============================================
 // Types
@@ -228,11 +229,11 @@ async function makeApiRequest<T>(
       if (lastError.code === 'RATE_LIMITED' && lastError.retryAfter) {
         // Use server-provided retry-after
         delayMs = lastError.retryAfter * 1000;
-        console.log(`[ZoomAPI] Rate limited, waiting ${lastError.retryAfter}s before retry ${attempt + 1}/${maxRetries}`);
+        logger.warn(`Rate limited, waiting ${lastError.retryAfter}s before retry ${attempt + 1}/${maxRetries}`);
       } else {
         // Use exponential backoff
         delayMs = calculateBackoffDelay(attempt, RETRY_CONFIG.baseDelayMs, RETRY_CONFIG.maxDelayMs);
-        console.log(`[ZoomAPI] Request failed, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+        logger.debug(`Request failed, retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`);
       }
 
       await sleep(delayMs);
@@ -252,9 +253,9 @@ async function makeApiRequest<T>(
  * Endpoint: GET /v2/users/me
  */
 export async function getCurrentUser(): Promise<ZoomUserInfo> {
-  console.log('[ZoomAPI] Fetching current user info...');
+  logger.debug('Fetching current user info...');
   const user = await makeApiRequest<ZoomUserInfo>('GET', '/users/me');
-  console.log(`[ZoomAPI] Current user: ${user.display_name} (${user.email})`);
+  logger.info(`Current user: ${user.display_name} (${user.email})`);
   return user;
 }
 
@@ -280,10 +281,10 @@ export async function getCurrentUserId(): Promise<string> {
  */
 export async function getPresenceStatus(userId?: string): Promise<ZoomPresenceStatusResponse> {
   const id = userId ?? await getCurrentUserId();
-  console.log(`[ZoomAPI] Getting presence status for user: ${id}`);
+  logger.debug(`Getting presence status for user: ${id}`);
 
   const response = await makeApiRequest<ZoomPresenceStatusResponse>('GET', `/users/${id}/presence_status`);
-  console.log(`[ZoomAPI] Current presence status: ${response.status}`);
+  logger.debug(`Current presence status: ${response.status}`);
   return response;
 }
 
@@ -301,7 +302,7 @@ export async function updatePresenceStatus(
   userId?: string
 ): Promise<void> {
   const id = userId ?? await getCurrentUserId();
-  console.log(`[ZoomAPI] Updating presence status for user ${id} to: ${status}`);
+  logger.debug(`Updating presence status for user ${id} to: ${status}`);
 
   const body: { status: string; duration?: number } = { status };
 
@@ -313,7 +314,7 @@ export async function updatePresenceStatus(
   }
 
   await makeApiRequest<Record<string, never>>('PUT', `/users/${id}/presence_status`, body);
-  console.log(`[ZoomAPI] Presence status updated to: ${status}`);
+  logger.info(`Presence status updated to: ${status}`);
 }
 
 // ============================================
@@ -352,7 +353,7 @@ async function clearPreviousStatus(): Promise<void> {
  * @returns The previous status that was saved
  */
 export async function setDoNotDisturb(duration: number = 60): Promise<ZoomPresenceStatus> {
-  console.log('[ZoomAPI] Setting Do Not Disturb mode...');
+  logger.info('Setting Do Not Disturb mode...');
 
   // Get current status before changing
   const currentStatus = await getPresenceStatus();
@@ -361,7 +362,7 @@ export async function setDoNotDisturb(duration: number = 60): Promise<ZoomPresen
   // Only save previous status if not already DND
   if (previousStatus !== 'Do_Not_Disturb') {
     await savePreviousStatus(previousStatus);
-    console.log(`[ZoomAPI] Saved previous status: ${previousStatus}`);
+    logger.debug(`Saved previous status: ${previousStatus}`);
   }
 
   // Set DND status
@@ -377,12 +378,12 @@ export async function setDoNotDisturb(duration: number = 60): Promise<ZoomPresen
  * @returns The status that was restored to
  */
 export async function restorePreviousStatus(): Promise<ZoomPresenceStatus> {
-  console.log('[ZoomAPI] Restoring previous status...');
+  logger.info('Restoring previous status...');
 
   const previousStatus = await getPreviousStatus();
   const statusToRestore = previousStatus ?? 'Available';
 
-  console.log(`[ZoomAPI] Restoring to: ${statusToRestore}`);
+  logger.debug(`Restoring to: ${statusToRestore}`);
   await updatePresenceStatus(statusToRestore);
 
   // Clear the saved status

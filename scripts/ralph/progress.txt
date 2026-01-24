@@ -399,3 +399,97 @@ add6b64 - feat(P0-8): Handle Tab and Window Close Events
 ## 2026-01-24 - P0-8: Handle Tab and Window Close Events
 - Completed by Ralph
 ---
+
+## 2026-01-24 01:08 - P0-8: Handle Tab and Window Close Events
+- Completed by Ralph
+---
+
+## 2026-01-24 01:12 - P0-9: Build Extension Popup UI
+- Completed by Ralph
+---
+
+## P0-10: Add Error Handling and User Notifications
+**Status:** COMPLETED
+**Date:** 2026-01-24
+
+### What was done:
+- Created `src/utils/logger.ts` with comprehensive logging utility:
+  - `createLogger(module)` factory function for module-specific loggers
+  - Log levels: debug, info, warn, error
+  - Timestamped log entries with format `[YYYY-MM-DD HH:mm:ss.mmm]`
+  - Automatic storage of warn/error logs to chrome.storage.local (last 100 entries)
+  - Pre-created loggers for Background, ZoomAPI, ZoomAuth, Popup, Content modules
+  - `getStoredLogs()`, `clearStoredLogs()`, `getRecentErrors()` for log access
+
+- Created `src/utils/notifications.ts` with Chrome notification system:
+  - `showNotification()` - Create Chrome notifications
+  - `notifyApiError()` - Show notification when Zoom API fails
+  - `notifyAuthExpired()` - Show notification with "Reconnect" button when auth expires
+  - `notifyNetworkError()` - Show notification for network connectivity issues
+  - `notifySuccess()` - Optional success notifications (silent by default)
+  - `initializeNotificationListeners()` - Set up click handlers for notification buttons
+  - `onNotificationButtonClick()` - Callback registration for button actions
+  - Error state persistence: `saveErrorState()`, `getErrorState()`, `clearErrorState()`, `dismissError()`
+  - Notifications can be enabled/disabled via `areNotificationsEnabled()` / `setNotificationsEnabled()`
+
+- Updated `src/background/index.ts`:
+  - Replaced all console.log with structured logger calls
+  - Added `handleZoomApiError()` function for centralized error handling
+  - Shows appropriate notifications based on error type (auth, network, API)
+  - Saves error state for popup display
+  - Clears error state on successful operations (graceful degradation)
+  - Initialized notification listeners on startup
+  - Added reconnect handler from notification button click
+
+- Updated `src/background/zoom-api.ts`:
+  - Replaced all console.log with `zoomApiLogger` calls
+  - Consistent timestamped logging for all API operations
+
+- Updated `src/popup/index.ts`:
+  - Added error state fetching and display
+  - Shows error banner with appropriate styling per error type
+  - Error banner includes action button (Reconnect/Retry) and dismiss button
+  - Different styling for auth_expired (warning), network_error (gray), api_error (red)
+  - Listens for error state changes in storage for real-time updates
+  - Replaced console.log with `popupLogger` calls
+
+- Updated `public/popup.html`:
+  - Added error banner HTML with icon, title, message, and action buttons
+  - Removed old simple error-message div
+
+- Updated `public/popup.css`:
+  - Added `.error-banner` styles with animations (slideDown)
+  - Added `.auth_expired`, `.network_error` variants with different colors
+  - Added `.status-card.error` and `.status-indicator.error` styles
+  - Added pulse-error animation for error indicator
+  - Added `.btn-small`, `.btn-error-action`, `.btn-error-dismiss` button styles
+
+- Updated `public/manifest.json`:
+  - Added `notifications` permission for Chrome notifications
+
+### Files created:
+- `src/utils/logger.ts` - Timestamped logging utility (175 lines)
+- `src/utils/notifications.ts` - Chrome notification system (275 lines)
+
+### Files modified:
+- `src/background/index.ts` - Integrated error handling and notifications
+- `src/background/zoom-api.ts` - Added structured logging
+- `src/popup/index.ts` - Added error state display
+- `public/popup.html` - Added error banner UI
+- `public/popup.css` - Added error state styling
+- `public/manifest.json` - Added notifications permission
+
+### Acceptance criteria verification:
+- [x] API failures show user notification - `notifyApiError()` called on API errors
+- [x] Auth expiry shows notification with "Reconnect" action - `notifyAuthExpired()` with button handler
+- [x] Popup shows error states clearly - Error banner with type-specific styling
+- [x] Errors are logged with timestamps - Logger utility with `[YYYY-MM-DD HH:mm:ss.mmm]` format
+- [x] Extension continues to work after transient errors - Graceful degradation in handleZoomApiError
+- [x] `npm run typecheck` - SUCCESS
+- [x] `npm run build` - SUCCESS
+
+---
+
+## 2026-01-24 - P0-10: Add Error Handling and User Notifications
+- Completed by Ralph
+---

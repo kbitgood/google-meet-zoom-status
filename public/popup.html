@@ -8,13 +8,87 @@
 </head>
 <body>
   <div class="popup-container">
-    <h1>Meet → Zoom Status</h1>
-    <div id="status-section">
-      <p id="auth-status">Loading...</p>
-      <p id="meeting-status"></p>
+    <!-- Header -->
+    <header class="header">
+      <div class="header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 10L19.5528 7.72361C20.2177 7.39116 21 7.87465 21 8.61803V15.382C21 16.1253 20.2177 16.6088 19.5528 16.2764L15 14V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="3" y="6" width="12" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Meet to Zoom</h1>
+        <p class="subtitle">Auto-update your Zoom status</p>
+      </div>
+    </header>
+
+    <!-- Error Banner -->
+    <div class="error-banner" id="error-banner" style="display: none;">
+      <div class="error-banner-content">
+        <div class="error-banner-icon" id="error-icon">
+          <svg viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <div class="error-banner-text">
+          <span class="error-banner-title" id="error-title">Error</span>
+          <span class="error-banner-message" id="error-text"></span>
+        </div>
+      </div>
+      <div class="error-banner-actions">
+        <button class="btn btn-small btn-error-action" id="error-action">Reconnect</button>
+        <button class="btn btn-small btn-error-dismiss" id="error-dismiss">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          </svg>
+        </button>
+      </div>
     </div>
-    <div id="actions">
-      <button id="auth-button" style="display: none;">Connect Zoom</button>
+
+    <!-- Connection Status -->
+    <section class="status-section">
+      <div class="status-card" id="zoom-status-card">
+        <div class="status-row">
+          <div class="status-indicator" id="zoom-indicator"></div>
+          <div class="status-content">
+            <span class="status-label">Zoom Connection</span>
+            <span class="status-value" id="zoom-status-text">Checking...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-card" id="meeting-status-card">
+        <div class="status-row">
+          <div class="status-indicator" id="meeting-indicator"></div>
+          <div class="status-content">
+            <span class="status-label">Meeting Status</span>
+            <span class="status-value" id="meeting-status-text">Checking...</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="actions-section" id="actions-section">
+      <button id="connect-btn" class="btn btn-primary" style="display: none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Connect to Zoom</span>
+      </button>
+      <button id="disconnect-btn" class="btn btn-secondary" style="display: none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Disconnect</span>
+      </button>
+    </section>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="spinner"></div>
+      <span>Connecting...</span>
     </div>
   </div>
   <script type="module" src="popup.js"></script>
