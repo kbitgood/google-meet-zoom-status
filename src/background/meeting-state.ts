@@ -4,6 +4,7 @@
  */
 
 import type { ZoomPresenceStatus } from '../types';
+import { backgroundLogger as logger } from '../utils/logger';
 
 // ============================================
 // Types
@@ -84,7 +85,7 @@ export async function addMeetingTab(tabId: number, meetingId?: string): Promise<
     // Update existing tab's meeting ID if changed
     state.activeTabs[existingIndex].meetingId = meetingId;
     await saveState(state);
-    console.log(`[MeetingState] Tab ${tabId} already tracked, updated meetingId`);
+    logger.debug(`Tab ${tabId} already tracked, updated meetingId`);
     return false;
   }
 
@@ -98,7 +99,7 @@ export async function addMeetingTab(tabId: number, meetingId?: string): Promise<
   });
 
   await saveState(state);
-  console.log(`[MeetingState] Added tab ${tabId}, total active: ${state.activeTabs.length}`);
+  logger.debug(`Added tab ${tabId}, total active: ${state.activeTabs.length}`);
 
   return wasEmpty;
 }
@@ -112,7 +113,7 @@ export async function removeMeetingTab(tabId: number): Promise<boolean> {
 
   const existingIndex = state.activeTabs.findIndex(t => t.tabId === tabId);
   if (existingIndex === -1) {
-    console.log(`[MeetingState] Tab ${tabId} not found in active tabs`);
+    logger.debug(`Tab ${tabId} not found in active tabs`);
     return false;
   }
 
@@ -120,7 +121,7 @@ export async function removeMeetingTab(tabId: number): Promise<boolean> {
   await saveState(state);
 
   const isEmpty = state.activeTabs.length === 0;
-  console.log(`[MeetingState] Removed tab ${tabId}, remaining: ${state.activeTabs.length}`);
+  logger.debug(`Removed tab ${tabId}, remaining: ${state.activeTabs.length}`);
 
   return isEmpty;
 }
@@ -169,7 +170,7 @@ export async function savePreviousZoomStatus(status: ZoomPresenceStatus): Promis
   state.previousZoomStatus = status;
   state.statusChangedAt = Date.now();
   await saveState(state);
-  console.log(`[MeetingState] Saved previous Zoom status: ${status}`);
+  logger.debug(`Saved previous Zoom status: ${status}`);
 }
 
 /**
@@ -188,7 +189,7 @@ export async function clearPreviousZoomStatus(): Promise<void> {
   state.previousZoomStatus = null;
   state.statusChangedAt = null;
   await saveState(state);
-  console.log('[MeetingState] Cleared previous Zoom status');
+  logger.debug('Cleared previous Zoom status');
 }
 
 // ============================================
@@ -224,7 +225,7 @@ export async function cleanupStaleTabs(): Promise<number> {
     return 0;
   }
 
-  console.log(`[MeetingState] Checking ${state.activeTabs.length} tabs for staleness`);
+  logger.debug(`Checking ${state.activeTabs.length} tabs for staleness`);
 
   const validTabs: ActiveMeetingTab[] = [];
   const staleTabs: number[] = [];
@@ -245,7 +246,7 @@ export async function cleanupStaleTabs(): Promise<number> {
   }
 
   if (staleTabs.length > 0) {
-    console.log(`[MeetingState] Removing ${staleTabs.length} stale tabs:`, staleTabs);
+    logger.info(`Removing ${staleTabs.length} stale tabs`, { staleTabs });
     state.activeTabs = validTabs;
     await saveState(state);
   }
@@ -263,7 +264,7 @@ export async function resetMeetingState(): Promise<void> {
     statusChangedAt: null,
   };
   await chrome.storage.local.remove(MEETING_STATE_STORAGE_KEY);
-  console.log('[MeetingState] Reset all meeting state');
+  logger.info('Reset all meeting state');
 }
 
 /**
@@ -272,7 +273,7 @@ export async function resetMeetingState(): Promise<void> {
  * Returns the number of stale tabs that were cleaned up (for crash recovery)
  */
 export async function initializeMeetingState(): Promise<number> {
-  console.log('[MeetingState] Initializing...');
+  logger.info('Initializing meeting state...');
 
   // Load state from storage
   await loadState();
@@ -280,11 +281,11 @@ export async function initializeMeetingState(): Promise<number> {
   // Clean up any stale tabs
   const staleCount = await cleanupStaleTabs();
   if (staleCount > 0) {
-    console.log(`[MeetingState] Cleaned up ${staleCount} stale tabs`);
+    logger.debug(`Cleaned up ${staleCount} stale tabs`);
   }
 
   const state = await loadState();
-  console.log(`[MeetingState] Initialized with ${state.activeTabs.length} active tabs`);
+  logger.info(`Meeting state initialized with ${state.activeTabs.length} active tabs`);
 
   return staleCount;
 }

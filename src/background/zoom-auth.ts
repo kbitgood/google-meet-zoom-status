@@ -6,6 +6,7 @@
 import { ZOOM_CONFIG, ZOOM_API, ZOOM_SCOPES } from '../config';
 import type { ZoomTokenData } from '../types';
 import { getZoomToken, saveZoomToken, removeZoomToken, shouldRefreshZoomToken } from '../utils/storage';
+import { zoomAuthLogger as logger } from '../utils/logger';
 
 // Token refresh timer ID
 let refreshTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -129,14 +130,14 @@ async function fetchUserId(accessToken: string): Promise<string> {
     });
 
     if (!response.ok) {
-      console.error('[ZoomAuth] Failed to fetch user ID:', response.status);
+      logger.error(`Failed to fetch user ID: ${response.status}`);
       return 'me'; // Fallback to 'me' which works for most Zoom API calls
     }
 
     const data = await response.json();
     return data.id || 'me';
   } catch (error) {
-    console.error('[ZoomAuth] Error fetching user ID:', error);
+    logger.error('Error fetching user ID', { error });
     return 'me';
   }
 }
@@ -215,18 +216,18 @@ function scheduleTokenRefresh(tokenData: ZoomTokenData): void {
 
   if (timeUntilRefresh <= 0) {
     // Token is already due for refresh, do it now
-    console.log('[ZoomAuth] Token needs immediate refresh');
-    performTokenRefresh().catch(console.error);
+    logger.info('Token needs immediate refresh');
+    performTokenRefresh().catch((err) => logger.error('Immediate token refresh failed', { error: err }));
     return;
   }
 
-  console.log(`[ZoomAuth] Scheduling token refresh in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
+  logger.info(`Scheduling token refresh in ${Math.round(timeUntilRefresh / 1000 / 60)} minutes`);
 
   refreshTimerId = setTimeout(async () => {
     try {
       await performTokenRefresh();
     } catch (error) {
-      console.error('[ZoomAuth] Scheduled token refresh failed:', error);
+      logger.error('Scheduled token refresh failed', { error });
     }
   }, timeUntilRefresh);
 }
@@ -237,24 +238,24 @@ function scheduleTokenRefresh(tokenData: ZoomTokenData): void {
 async function performTokenRefresh(): Promise<ZoomTokenData | null> {
   const currentToken = await getZoomToken();
   if (!currentToken) {
-    console.log('[ZoomAuth] No token to refresh');
+    logger.debug('No token to refresh');
     return null;
   }
 
-  console.log('[ZoomAuth] Refreshing access token...');
+  logger.info('Refreshing access token...');
 
   try {
     const newTokenData = await refreshAccessToken(currentToken.refreshToken);
     await saveZoomToken(newTokenData);
     scheduleTokenRefresh(newTokenData);
-    console.log('[ZoomAuth] Token refreshed successfully');
+    logger.info('Token refreshed successfully');
     return newTokenData;
   } catch (error) {
-    console.error('[ZoomAuth] Token refresh failed:', error);
+    logger.error('Token refresh failed', { error });
     // If refresh fails with a token error, the refresh token may be invalid
     // We should clear the tokens and require re-authentication
     if (error instanceof ZoomAuthError && error.code === 'TOKEN_ERROR') {
-      console.log('[ZoomAuth] Clearing invalid tokens');
+      logger.info('Clearing invalid tokens');
       await removeZoomToken();
     }
     throw error;
@@ -266,7 +267,7 @@ async function performTokenRefresh(): Promise<ZoomTokenData | null> {
  * This opens a popup window for the user to authorize the app
  */
 export async function initiateOAuthFlow(): Promise<ZoomTokenData> {
-  console.log('[ZoomAuth] Initiating OAuth flow...');
+  logger.info('Initiating OAuth flow...');
 
   const authUrl = buildAuthorizationUrl();
 
@@ -299,12 +300,12 @@ export async function initiateOAuthFlow(): Promise<ZoomTokenData> {
     );
   }
 
-  console.log('[ZoomAuth] Got callback URL, extracting authorization code...');
+  logger.debug('Got callback URL, extracting authorization code...');
 
   // Extract the authorization code from the callback
   const authorizationCode = extractAuthorizationCode(callbackUrl);
 
-  console.log('[ZoomAuth] Exchanging authorization code for tokens...');
+  logger.debug('Exchanging authorization code for tokens...');
 
   // Exchange the code for tokens
   const tokenData = await exchangeCodeForTokens(authorizationCode);
@@ -315,7 +316,7 @@ export async function initiateOAuthFlow(): Promise<ZoomTokenData> {
   // Schedule automatic refresh
   scheduleTokenRefresh(tokenData);
 
-  console.log('[ZoomAuth] OAuth flow completed successfully');
+  logger.info('OAuth flow completed successfully');
 
   return tokenData;
 }
@@ -325,7 +326,7 @@ export async function initiateOAuthFlow(): Promise<ZoomTokenData> {
  * Clears stored tokens and cancels scheduled refresh
  */
 export async function disconnect(): Promise<void> {
-  console.log('[ZoomAuth] Disconnecting from Zoom...');
+  logger.info('Disconnecting from Zoom...');
 
   // Cancel any scheduled token refresh
   if (refreshTimerId) {
@@ -336,7 +337,7 @@ export async function disconnect(): Promise<void> {
   // Remove stored tokens
   await removeZoomToken();
 
-  console.log('[ZoomAuth] Disconnected from Zoom');
+  logger.info('Disconnected from Zoom');
 }
 
 /**
@@ -355,7 +356,7 @@ export async function getValidAccessToken(): Promise<string | null> {
       const newTokenData = await performTokenRefresh();
       return newTokenData?.accessToken ?? null;
     } catch (error) {
-      console.error('[ZoomAuth] Failed to refresh token:', error);
+      logger.error('Failed to refresh token', { error });
       return null;
     }
   }
@@ -384,19 +385,19 @@ export async function getAuthenticatedUserId(): Promise<string | null> {
  * Restores refresh timer if tokens exist
  */
 export async function initializeAuth(): Promise<void> {
-  console.log('[ZoomAuth] Initializing auth module...');
+  logger.info('Initializing auth module...');
 
   const tokenData = await getZoomToken();
   if (tokenData) {
-    console.log('[ZoomAuth] Found existing tokens, checking validity...');
+    logger.debug('Found existing tokens, checking validity...');
 
     // Check if token is expired
     if (tokenData.expiresAt <= Date.now()) {
-      console.log('[ZoomAuth] Token expired, attempting refresh...');
+      logger.info('Token expired, attempting refresh...');
       try {
         await performTokenRefresh();
       } catch (error) {
-        console.error('[ZoomAuth] Failed to refresh expired token:', error);
+        logger.error('Failed to refresh expired token', { error });
         await removeZoomToken();
       }
     } else {
@@ -404,6 +405,6 @@ export async function initializeAuth(): Promise<void> {
       scheduleTokenRefresh(tokenData);
     }
   } else {
-    console.log('[ZoomAuth] No existing tokens found');
+    logger.debug('No existing tokens found');
   }
 }

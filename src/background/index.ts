@@ -284,9 +284,10 @@ async function handleTabUpdated(tabId: number, changeInfo: chrome.tabs.TabChange
     return;
   }
 
-  // Check if this tab was in a meeting
-  const wasInMeeting = await hasActiveMeetings();
-  if (!wasInMeeting) {
+  // Check if this specific tab was in a meeting
+  const meetingTabs = await getActiveMeetingTabs();
+  const tabWasInMeeting = meetingTabs.some(tab => tab.tabId === tabId);
+  if (!tabWasInMeeting) {
     return;
   }
 

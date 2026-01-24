@@ -4,6 +4,7 @@
  */
 
 import type { ExtensionMessage } from '../types';
+import { contentLogger as logger } from '../utils/logger';
 
 // Selectors for Google Meet UI elements
 const SELECTORS = {
@@ -384,7 +385,11 @@ export class MeetingDetector {
    */
   private log(...args: unknown[]): void {
     if (this.options.debug) {
-      console.log('[MeetDetector]', ...args);
+      // Use structured logger for consistent output
+      const message = args.map(arg => 
+        typeof arg === 'string' ? arg : JSON.stringify(arg)
+      ).join(' ');
+      logger.debug(message);
     }
   }
 }

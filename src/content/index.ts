@@ -4,8 +4,9 @@
  */
 
 import { createMeetingDetector, MeetingDetector } from './meet-detector';
+import { contentLogger as logger } from '../utils/logger';
 
-console.log('[Content] Google Meet content script loaded');
+logger.info('Google Meet content script loaded');
 
 let detector: MeetingDetector | null = null;
 
@@ -15,25 +16,25 @@ let detector: MeetingDetector | null = null;
 function initialize(): void {
   // Don't initialize if already running
   if (detector) {
-    console.log('[Content] Detector already initialized');
+    logger.debug('Detector already initialized');
     return;
   }
 
   // Only initialize on actual meeting pages
   if (!isMeetingPage()) {
-    console.log('[Content] Not a meeting page, skipping initialization');
+    logger.debug('Not a meeting page, skipping initialization');
     return;
   }
 
-  console.log('[Content] Initializing meeting detector');
+  logger.info('Initializing meeting detector');
 
   detector = createMeetingDetector({
     debug: true,
     onJoin: (meetingId) => {
-      console.log('[Content] Meeting joined callback:', meetingId);
+      logger.info('Meeting joined callback', { meetingId });
     },
     onLeave: () => {
-      console.log('[Content] Meeting left callback');
+      logger.info('Meeting left callback');
     },
   });
 
@@ -41,10 +42,10 @@ function initialize(): void {
   chrome.runtime.sendMessage({ type: 'GET_MEETING_STATE' })
     .then(() => {
       // Tab ID will be set by background script via sender info
-      console.log('[Content] Connected to background script');
+      logger.debug('Connected to background script');
     })
     .catch((err) => {
-      console.warn('[Content] Failed to connect to background script:', err);
+      logger.warn('Failed to connect to background script', { error: err?.message });
     });
 }
 
@@ -77,7 +78,7 @@ function cleanup(): void {
   if (detector) {
     detector.stop();
     detector = null;
-    console.log('[Content] Detector stopped');
+    logger.debug('Detector stopped');
   }
 }
 
