@@ -3,7 +3,7 @@
  * Provides type-safe wrappers around chrome.storage.local
  */
 
-import type { ZoomTokenData, MeetingState, ExtensionSettings } from '../types';
+import type { MeetingState, ExtensionSettings } from '../types';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../types';
 
 /**
@@ -33,62 +33,6 @@ async function remove(key: string): Promise<void> {
  */
 export async function clearAll(): Promise<void> {
   await chrome.storage.local.clear();
-}
-
-// ============================================
-// Zoom Token Storage
-// ============================================
-
-/**
- * Get stored Zoom OAuth tokens
- */
-export async function getZoomToken(): Promise<ZoomTokenData | null> {
-  return get<ZoomTokenData>(STORAGE_KEYS.ZOOM_TOKEN);
-}
-
-/**
- * Save Zoom OAuth tokens
- */
-export async function saveZoomToken(tokenData: ZoomTokenData): Promise<void> {
-  await set(STORAGE_KEYS.ZOOM_TOKEN, tokenData);
-}
-
-/**
- * Remove stored Zoom OAuth tokens (logout/disconnect)
- */
-export async function removeZoomToken(): Promise<void> {
-  await remove(STORAGE_KEYS.ZOOM_TOKEN);
-}
-
-/**
- * Check if Zoom tokens exist and are not expired
- * Checks with a buffer of 5 minutes before actual expiry
- */
-export async function isZoomTokenValid(): Promise<boolean> {
-  const tokenData = await getZoomToken();
-  if (!tokenData) {
-    return false;
-  }
-
-  // Check if token expires in more than 5 minutes
-  const bufferMs = 5 * 60 * 1000; // 5 minutes
-  const now = Date.now();
-  return tokenData.expiresAt > now + bufferMs;
-}
-
-/**
- * Check if Zoom token needs refresh (expires within 10 minutes)
- */
-export async function shouldRefreshZoomToken(): Promise<boolean> {
-  const tokenData = await getZoomToken();
-  if (!tokenData) {
-    return false;
-  }
-
-  // Refresh if token expires within 10 minutes
-  const refreshBufferMs = 10 * 60 * 1000; // 10 minutes
-  const now = Date.now();
-  return tokenData.expiresAt <= now + refreshBufferMs;
 }
 
 // ============================================

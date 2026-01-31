@@ -1,20 +1,18 @@
-# Integration Testing Guide
+# Testing Guide
 
-This document provides comprehensive testing instructions for the Google Meet to Zoom Status Chrome extension. Follow these tests to verify the complete extension flow works correctly.
+This document provides testing instructions for the Google Meet to Zoom Status Chrome extension.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Loading the Extension](#loading-the-extension)
+2. [Setup Verification](#setup-verification)
 3. [Test Cases](#test-cases)
-   - [OAuth Flow Testing](#oauth-flow-testing)
-   - [Meeting Detection Testing](#meeting-detection-testing)
-   - [Status Update Timing](#status-update-timing)
+   - [Hammerspoon Connection](#hammerspoon-connection)
+   - [Meeting Detection](#meeting-detection)
+   - [Status Updates](#status-updates)
    - [Multiple Tab Scenarios](#multiple-tab-scenarios)
-   - [Error Recovery Scenarios](#error-recovery-scenarios)
-4. [Acceptance Criteria Checklist](#acceptance-criteria-checklist)
-5. [Known Issues and Limitations](#known-issues-and-limitations)
-6. [Debugging Tips](#debugging-tips)
+   - [Error Handling](#error-handling)
+4. [Debugging Tips](#debugging-tips)
 
 ---
 
@@ -22,123 +20,95 @@ This document provides comprehensive testing instructions for the Google Meet to
 
 Before testing, ensure you have:
 
-1. **Zoom OAuth App configured** (see [ZOOM_OAUTH_SETUP.md](./ZOOM_OAUTH_SETUP.md))
-2. **Config file created**: Copy `src/config.example.ts` to `src/config.ts` and fill in your Zoom credentials
-3. **Extension built**: Run `npm run build`
-4. **Chrome/Arc browser** with Developer Mode enabled
+1. **Hammerspoon installed** and running
+2. **zoom_status module loaded** in Hammerspoon
+3. **Accessibility permissions** granted to Hammerspoon
+4. **Zoom desktop app** installed and signed in
+5. **Extension built**: Run `npm run build`
+6. **Extension loaded** in Chrome
 
-## Loading the Extension
+## Setup Verification
 
-1. Open `chrome://extensions` (or `arc://extensions` for Arc browser)
-2. Enable "Developer mode" toggle (top right)
-3. Click "Load unpacked"
-4. Select the `dist/` folder in this project
-5. Note the **Extension ID** (you'll need this for the OAuth redirect URI)
+### 1. Verify Hammerspoon Server
+
+```bash
+# Health check - should return success
+curl http://localhost:17394/health
+# Expected: {"success":true,"service":"zoom-status","version":"1.0"}
+
+# Status check - should return current Zoom status
+curl http://localhost:17394/status
+# Expected: {"success":true,"status":"Available"}
+```
+
+### 2. Verify Extension Loaded
+
+1. Open `chrome://extensions`
+2. Find "Google Meet to Zoom Status"
+3. Ensure it's enabled (toggle is blue)
+
+### 3. Verify Popup Shows Connected
+
+1. Click the extension icon
+2. Should show "Hammerspoon: Connected"
+3. Should show current Zoom status
 
 ---
 
 ## Test Cases
 
-### OAuth Flow Testing
+### Hammerspoon Connection
 
-#### Test 1.1: Initial Connection (Happy Path)
+#### Test 1.1: Connection Status
 
 **Steps:**
-1. Click the extension icon to open the popup
-2. Verify popup shows "Not connected" status
-3. Click "Connect to Zoom" button
-4. Observe OAuth popup opens
-5. Log in to Zoom (if not already)
-6. Authorize the application
-7. Popup closes automatically
+1. Ensure Hammerspoon is running with zoom_status module
+2. Click extension icon
 
-**Expected Results:**
-- OAuth popup opens to Zoom authorization page
-- After authorization, popup closes automatically
-- Extension popup shows "Connected" status with green indicator
-- Extension badge turns green
+**Expected:**
+- Popup shows "Hammerspoon: Connected" with green indicator
+- Current Zoom status is displayed
 
-**Timing Expectation:** OAuth flow should complete within 30 seconds (excluding user login time)
+#### Test 1.2: Disconnected State
+
+**Steps:**
+1. Quit Hammerspoon (or stop the HTTP server)
+2. Click extension icon
+
+**Expected:**
+- Popup shows "Hammerspoon: Not running" with gray indicator
+- Zoom status shows "-"
+
+#### Test 1.3: Reconnection
+
+**Steps:**
+1. With Hammerspoon stopped, open the popup
+2. Start Hammerspoon
+3. Wait 5 seconds or reopen popup
+
+**Expected:**
+- Status updates to "Connected"
 
 ---
 
-#### Test 1.2: User Cancels OAuth
-
-**Steps:**
-1. Click "Connect to Zoom" button
-2. When OAuth popup appears, close it manually (X button)
-
-**Expected Results:**
-- No error notification appears
-- Popup returns to "Not connected" state
-- No error banner in popup
-
----
-
-#### Test 1.3: Disconnect from Zoom
-
-**Steps:**
-1. Ensure you're connected to Zoom
-2. Click "Disconnect" button
-
-**Expected Results:**
-- Status changes to "Not connected"
-- Badge turns gray
-- "Connect to Zoom" button appears
-
----
-
-#### Test 1.4: Reconnect After Disconnect
-
-**Steps:**
-1. Disconnect from Zoom (Test 1.3)
-2. Click "Connect to Zoom" again
-3. Complete OAuth flow
-
-**Expected Results:**
-- OAuth flow works correctly
-- Connection is re-established
-- Previous meeting state is cleared
-
----
-
-#### Test 1.5: Token Refresh (Long Duration)
-
-**Steps:**
-1. Connect to Zoom
-2. Leave browser open for > 55 minutes (token expires in 1 hour)
-3. Verify connection status in popup
-
-**Expected Results:**
-- Token is automatically refreshed
-- No user action required
-- Connection remains active
-- Check service worker logs for refresh message
-
----
-
-### Meeting Detection Testing
+### Meeting Detection
 
 #### Test 2.1: Join Meeting Detection
 
 **Steps:**
-1. Ensure connected to Zoom
+1. Ensure Hammerspoon is running
 2. Open Google Meet: https://meet.google.com
 3. Create or join a meeting
 4. Click "Join now" button
 
-**Expected Results:**
-- Meeting join detected within 5 seconds of clicking "Join now"
-- Extension badge shows red "MTG" indicator
-- Popup shows "In a meeting" status
-- Zoom status changes to "Do Not Disturb" (verify in Zoom client or web)
+**Expected:**
+- Meeting join detected within 5 seconds
+- Popup shows "Meeting Status: In a meeting"
+- Zoom status changes to "Busy" with message "In Google Meet"
 
-**Timing Verification:**
+**Verification:**
 - Open DevTools on the Meet tab (F12 > Console)
 - Look for `[MeetDetector] Detected meeting join` message
-- Note timestamp and compare to when you clicked Join
-
----
 
 #### Test 2.2: Leave Meeting Detection
 
@@ -146,84 +116,54 @@ Before testing, ensure you have:
 1. While in a meeting, click "Leave call" button
 2. Confirm leaving if prompted
 
-**Expected Results:**
+**Expected:**
 - Meeting leave detected within 5 seconds
-- Extension badge returns to green (no text)
-- Popup shows "Not in a meeting" status
-- Zoom status restores to previous value (usually "Available")
+- Popup shows "Meeting Status: Not in a meeting"
+- Zoom status returns to "Available"
 
----
-
-#### Test 2.3: Pre-Join Screen Detection
+#### Test 2.3: Pre-Join Screen (Negative Test)
 
 **Steps:**
-1. Navigate to a meeting link (e.g., `meet.google.com/abc-defg-hij`)
-2. Wait on the pre-join screen (camera/mic preview)
+1. Navigate to a meeting link
+2. Stay on the pre-join screen (camera/mic preview)
 3. Do NOT click "Join now"
 
-**Expected Results:**
+**Expected:**
 - No meeting join detected
-- Badge remains green (not red "MTG")
-- Zoom status unchanged
+- Zoom status remains unchanged
 
 ---
 
-#### Test 2.4: Meeting Detection After Page Refresh
+### Status Updates
+
+#### Test 3.1: Manual Status Test via curl
 
 **Steps:**
-1. Join a meeting
-2. Refresh the page (F5 or Cmd+R)
-3. Rejoin the meeting
+```bash
+# Set status to "in meeting"
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/join
 
-**Expected Results:**
-- Original meeting leave is detected (brief status restore)
-- New meeting join is detected
-- Status correctly shows "Do Not Disturb"
+# Check Zoom app - should show Busy + "In Google Meet"
 
----
+# Set status back to available
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/leave
 
-### Status Update Timing
+# Check Zoom app - should show Available
+```
 
-#### Test 3.1: Status Update Speed on Join
+**Expected:**
+- Zoom status updates within 5 seconds of each command
+- Custom status message "In Google Meet" appears when busy
 
-**Steps:**
-1. Open Zoom client or Zoom web to see your current status
-2. Note your current status (e.g., "Available")
-3. Join a Google Meet
-4. Time how long until Zoom status changes to "Do Not Disturb"
-
-**Expected Results:**
-- Status updates within 5 seconds of meeting join detection
-- Total time from "Join now" click to Zoom status change: < 10 seconds
-
----
-
-#### Test 3.2: Status Restore Speed on Leave
+#### Test 3.2: Status Update Timing
 
 **Steps:**
-1. While in a meeting (status = DND)
-2. Note the time
-3. Click "Leave call"
-4. Time how long until Zoom status restores
-
-**Expected Results:**
-- Status restores within 5 seconds of meeting leave detection
-- Total time from "Leave call" click to status restore: < 10 seconds
-
----
-
-#### Test 3.3: Previous Status Preservation
-
-**Steps:**
-1. Set Zoom status to "Away" manually before testing
+1. Open Zoom desktop app to see your status
 2. Join a Google Meet
-3. Status should change to "Do Not Disturb"
-4. Leave the meeting
-5. Check Zoom status
+3. Time how long until Zoom status changes
 
-**Expected Results:**
-- Status is restored to "Away" (not "Available")
-- Extension correctly remembers the status before meeting
+**Expected:**
+- Status updates within 10 seconds of clicking "Join now"
 
 ---
 
@@ -233,16 +173,13 @@ Before testing, ensure you have:
 
 **Steps:**
 1. Join a meeting in Tab 1
-2. Verify status changes to DND
+2. Verify Zoom status is "Busy"
 3. Open a second meeting in Tab 2
 4. Close Tab 1
 
-**Expected Results:**
-- Status remains "Do Not Disturb" (Tab 2 still in meeting)
-- Badge shows "MTG"
-- Only when Tab 2 is closed/left does status restore
-
----
+**Expected:**
+- Status remains "Busy" (Tab 2 still in meeting)
+- Only when Tab 2 is closed does status restore
 
 #### Test 4.2: Tab Close During Meeting
 
@@ -250,144 +187,45 @@ Before testing, ensure you have:
 1. Join a meeting
 2. Close the tab (X button) instead of leaving properly
 
-**Expected Results:**
+**Expected:**
 - Extension detects tab close
-- Status restores to previous value within 5 seconds
-- Badge returns to green
+- Status restores to "Available" within 5 seconds
 
----
-
-#### Test 4.3: Window Close During Meeting
+#### Test 4.3: Navigate Away from Meet
 
 **Steps:**
 1. Join a meeting
-2. Close the entire browser window
+2. Navigate to a different URL in the same tab
 
-**Expected Results:**
-- On next browser launch, status should be restored
-- Crash recovery logic handles stale meeting state
-
----
-
-#### Test 4.4: Navigate Away from Meet
-
-**Steps:**
-1. Join a meeting
-2. Navigate to a different URL in the same tab (e.g., google.com)
-
-**Expected Results:**
-- Extension detects navigation away from Meet
-- Treated as "meeting left"
-- Status restores
+**Expected:**
+- Extension detects navigation away
+- Status restores to "Available"
 
 ---
 
-### Error Recovery Scenarios
+### Error Handling
 
-#### Test 5.1: Network Error During Status Update
+#### Test 5.1: Hammerspoon Not Running
 
 **Steps:**
-1. Connect to Zoom
-2. Disable network (airplane mode)
-3. Join a meeting
-4. Re-enable network
+1. Quit Hammerspoon
+2. Join a Google Meet
 
-**Expected Results:**
-- Error notification appears about network issue
+**Expected:**
+- Extension gracefully handles connection failure
+- No crash or error popup
+- Popup shows "Hammerspoon: Not running"
+
+#### Test 5.2: Zoom App Not Running
+
+**Steps:**
+1. Quit Zoom
+2. Join a Google Meet
+
+**Expected:**
+- Hammerspoon receives request but can't control Zoom
+- Check Hammerspoon console for error message
 - Extension continues to function
-- Status update will be attempted on next meeting event
-
----
-
-#### Test 5.2: Token Expiry During Meeting
-
-**Steps:**
-1. Connect to Zoom
-2. Wait for token to expire (or manually clear token from storage)
-3. Join/leave a meeting
-
-**Expected Results:**
-- "Session expired" notification appears
-- Popup shows warning about expired session
-- User can reconnect via popup or notification
-
----
-
-#### Test 5.3: Zoom API Rate Limiting
-
-**Steps:**
-1. Rapidly join/leave meetings (or use dev tools to trigger API calls)
-2. Exceed rate limit (~100 requests/day for presence)
-
-**Expected Results:**
-- Extension handles 429 errors gracefully
-- Exponential backoff applied
-- Status eventually updates when rate limit clears
-
----
-
-#### Test 5.4: Browser Restart Recovery
-
-**Steps:**
-1. Join a meeting
-2. Force quit the browser (not normal close)
-3. Reopen browser
-
-**Expected Results:**
-- Extension detects stale meeting state
-- Zoom status is restored to previous value
-- No lingering "Do Not Disturb" status
-
----
-
-## Acceptance Criteria Checklist
-
-Use this checklist to verify all acceptance criteria are met:
-
-| Criteria | Status | Notes |
-|----------|--------|-------|
-| OAuth flow works end-to-end | [ ] | Test 1.1 |
-| Meeting join detected within 5 seconds | [ ] | Test 2.1 |
-| Status updates within 5 seconds of meeting join | [ ] | Test 3.1 |
-| Status restores within 5 seconds of meeting leave | [ ] | Test 3.2 |
-| Multiple tabs work correctly | [ ] | Tests 4.1-4.4 |
-| Tab close resets status | [ ] | Test 4.2 |
-| Error recovery works | [ ] | Tests 5.1-5.4 |
-| `npm run typecheck` passes | [ ] | Run before commit |
-| `npm run build` succeeds | [ ] | Run before commit |
-
----
-
-## Known Issues and Limitations
-
-### Google Meet DOM Changes
-
-Google Meet's DOM structure can change with updates. The meeting detection uses multiple strategies:
-1. Data attributes (`data-is-muted`, `data-call-state`)
-2. ARIA labels on buttons
-3. Text content patterns ("Present now", "Leave call")
-4. Button presence (mute, camera, leave)
-
-If detection fails after a Google Meet update, check `src/content/meet-detector.ts` and update selectors.
-
-### Zoom API Rate Limits
-
-- Presence status endpoint: ~100 updates per day
-- Extension implements exponential backoff
-- Excessive meeting joins/leaves may hit limits
-
-### Service Worker Lifecycle
-
-Chrome service workers are terminated when idle. The extension:
-- Persists all state to `chrome.storage.local`
-- Re-initializes on service worker restart
-- Handles crash recovery
-
-### Token Refresh Timing
-
-- Tokens expire in 1 hour
-- Refresh scheduled 5 minutes before expiry
-- If service worker is terminated, refresh happens on next wake
 
 ---
 
@@ -397,16 +235,22 @@ Chrome service workers are terminated when idle. The extension:
 
 1. Go to `chrome://extensions`
 2. Find the extension
-3. Click "service worker" link (under "Inspect views")
+3. Click "service worker" link
 4. View Console tab for logs
 
 ### View Content Script Logs
 
 1. Open a Google Meet page
 2. Open DevTools (F12)
-3. Look for `[MeetDetector]` and `[Content]` messages
+3. Look for `[MeetDetector]` messages
 
-### Check Storage State
+### View Hammerspoon Console
+
+1. Click Hammerspoon menubar icon
+2. Select "Console"
+3. Look for `[ZoomStatus]` messages
+
+### Check Extension Storage
 
 In the service worker DevTools console:
 ```javascript
@@ -414,62 +258,74 @@ In the service worker DevTools console:
 chrome.storage.local.get(null, console.log)
 
 // Check meeting state
-chrome.storage.local.get('meetingStateData', console.log)
-
-// Check Zoom token
-chrome.storage.local.get('zoomToken', console.log)
-
-// Check error state
-chrome.storage.local.get('lastErrorState', console.log)
+chrome.storage.local.get('meetingState', console.log)
 ```
 
-### Force Token Refresh
+### Test Hammerspoon Module Directly
+
+```bash
+# Health check
+curl http://localhost:17394/health
+
+# Get status
+curl http://localhost:17394/status
+
+# Simulate join
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/join
+
+# Simulate leave
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/leave
+```
+
+### Reload Hammerspoon
+
+```bash
+hs -c 'hs.reload()'
+```
+
+### Reset Extension State
 
 In service worker DevTools:
 ```javascript
-// Clear token to test re-auth
-chrome.storage.local.remove('zoomToken')
-```
-
-### Reset All Extension State
-
-In service worker DevTools:
-```javascript
-// Complete reset
 chrome.storage.local.clear()
 ```
 
-### Test Meeting Detection Manually
+---
 
-In content script DevTools (on a Meet page):
-```javascript
-// Force a state check
-detector?.forceCheck()
+## Acceptance Criteria Checklist
 
-// View current state
-detector?.getState()
-```
+| Criteria | Status | Notes |
+|----------|--------|-------|
+| Hammerspoon connection detected | [ ] | Test 1.1 |
+| Meeting join detected within 5 seconds | [ ] | Test 2.1 |
+| Zoom status updates on join | [ ] | Test 3.1 |
+| Zoom status restores on leave | [ ] | Test 2.2 |
+| Multiple tabs work correctly | [ ] | Test 4.1 |
+| Tab close resets status | [ ] | Test 4.2 |
+| Handles Hammerspoon not running | [ ] | Test 5.1 |
+| `npm run typecheck` passes | [ ] | Run before commit |
+| `npm run build` succeeds | [ ] | Run before commit |
 
 ---
 
 ## Manual Testing Log
 
-Use this template to log your testing sessions:
+Use this template to log testing sessions:
 
 ```
 Date: YYYY-MM-DD
 Tester: Name
 Browser: Chrome/Arc Version X.X
 Extension Version: 1.0.0
+Hammerspoon Version: X.X.X
 
 Test Results:
-- Test 1.1 (OAuth Happy Path): PASS/FAIL - Notes
-- Test 1.2 (User Cancel): PASS/FAIL - Notes
+- Test 1.1 (Connection): PASS/FAIL - Notes
+- Test 2.1 (Join Detection): PASS/FAIL - Notes
 - ...
 
 Issues Found:
 - Issue 1: Description, Steps to Reproduce
-- Issue 2: Description, Steps to Reproduce
 
-Overall Status: READY/NOT READY for release
+Overall Status: READY/NOT READY
 ```

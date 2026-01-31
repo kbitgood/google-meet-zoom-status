@@ -3,7 +3,6 @@
  * Tracks active meeting tabs and persists state for service worker restarts
  */
 
-import type { ZoomPresenceStatus } from '../types';
 import { backgroundLogger as logger } from '../utils/logger';
 
 // ============================================
@@ -24,7 +23,6 @@ export interface ActiveMeetingTab {
  */
 export interface MeetingStateData {
   activeTabs: ActiveMeetingTab[];
-  previousZoomStatus: ZoomPresenceStatus | null;
   statusChangedAt: number | null; // When we changed the Zoom status
 }
 
@@ -53,7 +51,6 @@ async function loadState(): Promise<MeetingStateData> {
 
   stateCache = stored ?? {
     activeTabs: [],
-    previousZoomStatus: null,
     statusChangedAt: null,
   };
 
@@ -159,40 +156,6 @@ export async function hasActiveMeetings(): Promise<boolean> {
 }
 
 // ============================================
-// Public: Zoom Status Tracking
-// ============================================
-
-/**
- * Save the previous Zoom status before we change it
- */
-export async function savePreviousZoomStatus(status: ZoomPresenceStatus): Promise<void> {
-  const state = await loadState();
-  state.previousZoomStatus = status;
-  state.statusChangedAt = Date.now();
-  await saveState(state);
-  logger.debug(`Saved previous Zoom status: ${status}`);
-}
-
-/**
- * Get the previously saved Zoom status
- */
-export async function getPreviousZoomStatus(): Promise<ZoomPresenceStatus | null> {
-  const state = await loadState();
-  return state.previousZoomStatus;
-}
-
-/**
- * Clear the saved previous status after restoring
- */
-export async function clearPreviousZoomStatus(): Promise<void> {
-  const state = await loadState();
-  state.previousZoomStatus = null;
-  state.statusChangedAt = null;
-  await saveState(state);
-  logger.debug('Cleared previous Zoom status');
-}
-
-// ============================================
 // Public: State Queries
 // ============================================
 
@@ -260,7 +223,6 @@ export async function cleanupStaleTabs(): Promise<number> {
 export async function resetMeetingState(): Promise<void> {
   stateCache = {
     activeTabs: [],
-    previousZoomStatus: null,
     statusChangedAt: null,
   };
   await chrome.storage.local.remove(MEETING_STATE_STORAGE_KEY);

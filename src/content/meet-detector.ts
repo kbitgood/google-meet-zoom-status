@@ -13,7 +13,10 @@ const SELECTORS = {
   CAMERA_BUTTON: '[data-is-camera-on]',
   MEETING_CONTROLS: '[data-call-state]',
   CALL_CONTROLS_CONTAINER: 'div[jscontroller][jsaction*="mute"]',
-  BOTTOM_BAR_BUTTONS: 'button[aria-label*="microphone"], button[aria-label*="camera"]',
+  BOTTOM_BAR_BUTTONS: 'button[aria-label*="microphone"], button[aria-label*="camera"], button[aria-label*="Microphone"], button[aria-label*="Camera"]',
+  
+  // The red "Leave call" button is a strong indicator of being in a meeting
+  END_CALL_BUTTON: 'button[aria-label*="Leave call"], button[aria-label="Leave call"]',
   
   // Pre-join elements (present before joining)
   JOIN_BUTTON: 'button[jsname="Qx7uuf"]', // "Join now" button
@@ -226,6 +229,13 @@ export class MeetingDetector {
    * Check for active meeting indicators
    */
   private hasActiveMeetingIndicators(): boolean {
+    // Check for the red "Leave call" button - this is the most reliable indicator
+    const endCallButton = document.querySelector(SELECTORS.END_CALL_BUTTON);
+    if (endCallButton) {
+      this.log('Found end call button');
+      return true;
+    }
+
     // Check for mute/camera buttons with state
     const muteButton = document.querySelector(SELECTORS.MUTE_BUTTON);
     const cameraButton = document.querySelector(SELECTORS.CAMERA_BUTTON);
@@ -242,7 +252,10 @@ export class MeetingDetector {
 
     // Check for bottom bar control buttons (mic/camera)
     const bottomBarButtons = document.querySelectorAll(SELECTORS.BOTTOM_BAR_BUTTONS);
-    if (bottomBarButtons.length >= 2) return true;
+    if (bottomBarButtons.length >= 2) {
+      this.log('Found bottom bar buttons:', bottomBarButtons.length);
+      return true;
+    }
 
     // Check for leave button (only present during active call)
     const leaveButton = document.querySelector(SELECTORS.LEAVE_BUTTON);
@@ -384,13 +397,12 @@ export class MeetingDetector {
    * Log helper
    */
   private log(...args: unknown[]): void {
-    if (this.options.debug) {
-      // Use structured logger for consistent output
-      const message = args.map(arg => 
-        typeof arg === 'string' ? arg : JSON.stringify(arg)
-      ).join(' ');
-      logger.debug(message);
-    }
+    // Always log for now to debug the issue
+    const message = args.map(arg => 
+      typeof arg === 'string' ? arg : JSON.stringify(arg)
+    ).join(' ');
+    logger.debug(message);
+    console.log('[MeetDetector]', ...args);
   }
 }
 

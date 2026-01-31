@@ -1,24 +1,74 @@
 # Google Meet to Zoom Status
 
-A Chrome extension that automatically updates your Zoom presence status when you join or leave Google Meet calls.
+A Chrome extension that automatically updates your Zoom presence status when you join or leave Google Meet calls. Uses Hammerspoon (macOS) for local Zoom control - no cloud services or OAuth required.
 
 ## Features
 
-- **Automatic Status Sync**: Detects when you join a Google Meet and sets your Zoom status to "Do Not Disturb"
-- **Smart Restore**: Automatically restores your previous Zoom status when you leave the meeting
+- **Automatic Status Sync**: Detects when you join a Google Meet and sets your Zoom status to "Busy" with a custom message "In Google Meet"
+- **Smart Restore**: Automatically restores your Zoom status to "Available" when you leave the meeting
 - **Multi-Tab Support**: Handles multiple Google Meet tabs - status only resets when you leave all meetings
-- **Visual Indicators**: Extension badge shows current state (connected, disconnected, in meeting)
-- **Error Recovery**: Graceful handling of network issues, token expiry, and API errors
+- **100% Local**: All processing happens on your Mac - no cloud services, no OAuth, no API rate limits
+- **Custom Status Message**: Sets "In Google Meet" as your Zoom status message (not possible with Zoom's REST API)
+
+## How It Works
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Chrome         │     │   Hammerspoon    │     │     Zoom        │
+│  Extension      │────▶│   HTTP Server    │────▶│   (macOS app)   │
+│                 │     │   localhost:17394│     │                 │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+     Detects              Receives HTTP           UI automation via
+     Google Meet          requests and            accessibility APIs
+     join/leave           controls Zoom
+```
+
+The extension detects Google Meet events and sends HTTP requests to a local Hammerspoon server, which then controls Zoom's native macOS app via accessibility APIs.
+
+## Requirements
+
+- **macOS** (Hammerspoon is macOS-only)
+- **Chrome** or Chromium-based browser (Arc, Edge, Brave, etc.)
+- **Hammerspoon** - free macOS automation tool
+- **Zoom** desktop app installed
 
 ## Installation
 
-### From Chrome Web Store (Recommended)
+### 1. Install Hammerspoon
 
-1. Visit the [Chrome Web Store listing](#) *(link coming soon)*
-2. Click "Add to Chrome"
-3. Follow the setup instructions below
+```bash
+brew install --cask hammerspoon
+```
 
-### From Source (Developer Installation)
+Or download from [hammerspoon.org](https://www.hammerspoon.org/).
+
+**Important**: Grant Hammerspoon accessibility permissions when prompted (System Settings > Privacy & Security > Accessibility).
+
+### 2. Set Up the Hammerspoon Module
+
+Add the zoom_status module to your Hammerspoon config:
+
+```bash
+# Add the module path to your init.lua
+echo 'package.path = package.path .. ";/path/to/google-meet-zoom-status/scripts/?.lua"' >> ~/.hammerspoon/init.lua
+echo 'require("zoom_status")' >> ~/.hammerspoon/init.lua
+```
+
+Or manually edit `~/.hammerspoon/init.lua`:
+
+```lua
+-- Add path to the zoom_status module
+package.path = package.path .. ";/Users/YOUR_USERNAME/Projects/google-meet-zoom-status/scripts/?.lua"
+
+-- Load the module (starts HTTP server automatically)
+require("zoom_status")
+```
+
+Reload Hammerspoon (click menubar icon > Reload Config).
+
+### 3. Install the Chrome Extension
+
+**From Source:**
 
 1. Clone the repository:
    ```bash
@@ -26,68 +76,65 @@ A Chrome extension that automatically updates your Zoom presence status when you
    cd google-meet-zoom-status
    ```
 
-2. Install dependencies:
+2. Install dependencies and build:
    ```bash
    npm install
-   ```
-
-3. Build the extension:
-   ```bash
    npm run build
    ```
 
-4. Load in Chrome:
+3. Load in Chrome:
    - Open `chrome://extensions`
    - Enable "Developer mode" (toggle in top-right)
    - Click "Load unpacked"
    - Select the `dist/` folder
 
-## Zoom OAuth App Setup
+### 4. Verify Setup
 
-Before using the extension, you need to create a Zoom OAuth app to authorize status updates.
-
-### Quick Setup
-
-1. Go to [Zoom App Marketplace](https://marketplace.zoom.us/develop/create)
-2. Sign in and click **Build App** > **OAuth**
-3. Configure your app:
-   - **App Name**: `Google Meet Status Sync`
-   - **Redirect URL**: `https://<YOUR_EXTENSION_ID>.chromiumapp.org/`
-     - Get your extension ID from `chrome://extensions` after loading the extension
-   - **Scopes**: Add `user:read` and `user:write`
-4. Copy your **Client ID** and **Client Secret**
-5. Create `src/config.ts` from the example:
+1. Check Hammerspoon server is running:
    ```bash
-   cp src/config.example.ts src/config.ts
+   curl http://localhost:17394/health
+   # Should return: {"success":true,"service":"zoom-status","version":"1.0"}
    ```
-6. Add your credentials to `src/config.ts`
-7. Rebuild: `npm run build`
 
-For detailed instructions, see [docs/ZOOM_OAUTH_SETUP.md](docs/ZOOM_OAUTH_SETUP.md).
+2. Click the extension icon - should show "Hammerspoon: Connected"
+
+3. Make sure Zoom is running
 
 ## Usage
 
-1. Click the extension icon in your browser toolbar
-2. Click "Connect Zoom" to authorize the extension
-3. Authorize with your Zoom account in the popup
-4. You're set! The extension will now automatically:
-   - Set your Zoom status to "Do Not Disturb" when you join a Google Meet
-   - Restore your previous status when you leave
+Once installed, the extension works automatically:
 
-### Status Indicators
+1. **Join a Google Meet** → Zoom status changes to "Busy" with message "In Google Meet"
+2. **Leave the meeting** → Zoom status returns to "Available"
 
-| Badge | Meaning |
-|-------|---------|
-| Gray | Not connected to Zoom |
-| Green | Connected and ready |
-| Red with "MTG" | Currently in a meeting |
+### Extension Popup
+
+Click the extension icon to see:
+- **Hammerspoon**: Connection status to local server
+- **Meeting Status**: Whether you're currently in a Google Meet
+- **Zoom Status**: Your current Zoom presence status
+
+### Manual Testing
+
+Test the Hammerspoon integration directly:
+
+```bash
+# Check current status
+curl http://localhost:17394/status
+
+# Simulate joining a meeting
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/join
+
+# Simulate leaving a meeting  
+curl -X POST -H "Content-Length: 0" http://localhost:17394/meeting/leave
+```
 
 ## Development
 
 ### Prerequisites
 
 - Node.js 18.0.0 or later
-- npm or pnpm
+- npm
 
 ### Commands
 
@@ -95,14 +142,11 @@ For detailed instructions, see [docs/ZOOM_OAUTH_SETUP.md](docs/ZOOM_OAUTH_SETUP.
 # Install dependencies
 npm install
 
-# Build extension (development)
+# Build extension
 npm run build
 
 # Build with watch mode
 npm run build:watch
-
-# Build for production (minified + ZIP)
-npm run build:dist
 
 # Type checking
 npm run typecheck
@@ -112,73 +156,86 @@ npm run typecheck
 
 ```
 src/
-├── background/           # Service worker
-│   ├── index.ts         # Main entry point
-│   ├── zoom-auth.ts     # OAuth authentication
-│   ├── zoom-api.ts      # Zoom API calls
-│   └── meeting-state.ts # Meeting state tracking
-├── content/             # Content scripts (Google Meet)
-│   ├── index.ts         # Entry point
-│   └── meet-detector.ts # Meeting detection logic
-├── popup/               # Extension popup
-│   └── index.ts         # Popup logic
-├── utils/               # Shared utilities
-│   ├── storage.ts       # Chrome storage helpers
-│   ├── notifications.ts # Notification system
-│   └── logger.ts        # Logging utility
-├── types.ts             # TypeScript types
-└── config.ts            # Zoom credentials (not in git)
+├── background/              # Service worker
+│   ├── index.ts            # Main entry point
+│   ├── hammerspoon-api.ts  # HTTP client for Hammerspoon
+│   └── meeting-state.ts    # Meeting state tracking
+├── content/                 # Content scripts (Google Meet)
+│   ├── index.ts            # Entry point
+│   └── meet-detector.ts    # Meeting detection logic
+├── popup/                   # Extension popup
+│   └── index.ts            # Popup logic
+├── utils/                   # Shared utilities
+│   ├── storage.ts          # Chrome storage helpers
+│   ├── notifications.ts    # Notification system
+│   └── logger.ts           # Logging utility
+└── types.ts                 # TypeScript types
+
+scripts/
+└── zoom_status.lua          # Hammerspoon module
 
 public/
-├── manifest.json        # Extension manifest
-├── popup.html           # Popup HTML
-├── popup.css            # Popup styles
-└── icons/               # Extension icons
+├── manifest.json            # Extension manifest
+├── popup.html               # Popup HTML
+├── popup.css                # Popup styles
+└── icons/                   # Extension icons
 ```
 
 ## Troubleshooting
 
-### "Invalid redirect URI" Error
+### "Hammerspoon: Not running" in popup
 
-- Ensure the redirect URI in Zoom matches exactly: `https://<EXTENSION_ID>.chromiumapp.org/`
-- The URL must end with a trailing slash
-- Extension ID must be lowercase
+1. Make sure Hammerspoon is running (check menubar)
+2. Verify the zoom_status module is loaded:
+   ```bash
+   curl http://localhost:17394/health
+   ```
+3. If no response, check `~/.hammerspoon/init.lua` has the correct path
+4. Reload Hammerspoon config
 
-### Extension ID Changed
+### Zoom status not changing
 
-If you reload the unpacked extension, the ID may change:
-1. Get the new ID from `chrome://extensions`
-2. Update the redirect URI in your Zoom app settings
-3. Update `src/config.ts` with the new redirect URI
+1. Make sure Zoom app is running and signed in
+2. The Zoom window needs to exist (can be minimized, but not closed)
+3. Check Hammerspoon console for errors (Hammerspoon menubar > Console)
+4. Verify accessibility permissions for Hammerspoon
 
-### Status Not Updating
+### Meeting detection not working
 
-1. Check the extension popup for error messages
-2. Ensure you have a valid Zoom connection (green badge)
-3. Try disconnecting and reconnecting to Zoom
-4. Check the console for errors (right-click extension icon > Inspect popup)
+1. Open Chrome DevTools on the Google Meet tab
+2. Look for `[MeetDetector]` messages in console
+3. Make sure you've actually joined (not just on preview screen)
 
-### OAuth Popup Not Opening
+### Extension not connecting to Hammerspoon
 
-- Ensure popups aren't blocked for Chrome extensions
-- Try disabling other extensions that might interfere
-- Check Chrome's console for JavaScript errors
+Check that `http://localhost:17394` is accessible:
+```bash
+curl -v http://localhost:17394/health
+```
 
-### Rate Limit Errors
-
-Zoom limits presence status updates to approximately 100/day. The extension is designed to minimize API calls, but if you're testing frequently:
-- Wait a few hours before testing again
-- The extension will automatically retry with backoff
+If blocked, check for firewall rules or other software blocking localhost.
 
 ## Privacy
 
 This extension:
+- Runs entirely on your local machine
+- No cloud services, no external API calls
+- No data collection or transmission
 - Only accesses Google Meet pages to detect meeting state
-- Only communicates with Zoom's API to update your status
-- Stores OAuth tokens locally in Chrome's secure storage
-- Never collects, transmits, or stores any personal data beyond what's required for functionality
+- Only communicates with localhost (Hammerspoon)
 
 See [PRIVACY_POLICY.md](PRIVACY_POLICY.md) for the full privacy policy.
+
+## Why Hammerspoon?
+
+The Zoom REST API doesn't support setting custom status messages - only presence status (Available, Away, DND). To show "In Google Meet" as your status message, we need to control Zoom's native UI, which Hammerspoon can do via macOS accessibility APIs.
+
+Benefits:
+- Custom status messages ("In Google Meet")
+- No OAuth setup required
+- No API rate limits
+- No cloud dependencies
+- Works offline (once Zoom is signed in)
 
 ## License
 
@@ -196,6 +253,6 @@ Contributions are welcome! Please:
 
 ## Acknowledgments
 
-- [Zoom API](https://developers.zoom.us/) for the presence status API
+- [Hammerspoon](https://www.hammerspoon.org/) for macOS automation
 - [Chrome Extensions API](https://developer.chrome.com/docs/extensions/) for the extension framework
 - [esbuild](https://esbuild.github.io/) for blazing fast builds

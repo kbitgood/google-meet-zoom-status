@@ -18,15 +18,14 @@ const commonOptions = {
   minify: !isWatch,
   sourcemap: isWatch,
   target: ['chrome120'],
-  format: 'esm',
   logLevel: 'info',
 };
 
 // Entry points for the extension
 const entryPoints = [
-  { in: 'src/background/index.ts', out: 'background' },
-  { in: 'src/content/index.ts', out: 'content' },
-  { in: 'src/popup/index.ts', out: 'popup' },
+  { in: 'src/background/index.ts', out: 'background', format: 'esm' },
+  { in: 'src/content/index.ts', out: 'content', format: 'iife' },  // Content scripts must be IIFE, not ESM
+  { in: 'src/popup/index.ts', out: 'popup', format: 'iife' },
 ];
 
 // Copy public files to dist
@@ -48,6 +47,7 @@ async function build() {
       entryPoints.map((entry) =>
         esbuild.context({
           ...commonOptions,
+          format: entry.format,
           entryPoints: [entry.in],
           outfile: join(distDir, `${entry.out}.js`),
         })
