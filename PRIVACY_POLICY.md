@@ -1,129 +1,77 @@
 # Privacy Policy
 
 **Google Meet to Zoom Status**  
-*Last Updated: January 31, 2026*
+*Last Updated: February 11, 2026*
 
 ## Overview
 
-Google Meet to Zoom Status is a Chrome browser extension that automatically updates your Zoom presence status when you join or leave Google Meet video calls. This extension operates entirely locally on your Mac - no data is transmitted to external servers.
+Google Meet to Zoom Status is a Chrome extension that detects Google Meet join/leave activity and triggers a local Zoom automation service running on your machine.
+
+This project does not send your meeting data to third-party servers controlled by this extension.
 
 ## How It Works
 
-The extension uses a two-part system:
+The system has two local components:
 
-1. **Chrome Extension**: Detects when you join/leave Google Meet calls
-2. **Hammerspoon** (local macOS automation): Controls the Zoom desktop app via accessibility APIs
-
-All communication happens locally on your machine via `localhost`.
+1. **Chrome Extension**: Detects whether you are currently in a Google Meet call.
+2. **Zoom Automator (Bun + Playwright)**: Runs on `localhost:17394` and controls `https://app.zoom.us` in a local browser profile to start/end one private meeting.
 
 ## Data Collection
 
-### What We Collect
+### What we collect remotely
 
-**Nothing.** This extension does not collect, store, or transmit any personal data to external servers.
+None.
 
-### What Is Stored Locally
+This project does not transmit your meeting metadata/content to external servers owned by this project.
 
-The extension stores minimal data locally on your device using Chrome's storage:
+### What is stored locally
 
-| Data Type | Purpose | Storage |
-|-----------|---------|---------|
-| Meeting state | Track if you're in a Google Meet call | Chrome local storage |
-| Extension settings | User preferences | Chrome local storage |
+| Data Type | Where | Purpose |
+|-----------|-------|---------|
+| Meeting tab state | `chrome.storage.local` | Track active Google Meet tabs |
+| Zoom web session profile (cookies/session/local storage) | Local Playwright profile directory on your machine | Keep you logged in after one-time MFA |
 
-### What We Do NOT Collect
+### What we do not collect
 
-- We do NOT collect personal information (name, email, etc.)
-- We do NOT collect meeting content, audio, video, or chat
-- We do NOT collect browsing history
-- We do NOT track which meetings you attend
-- We do NOT collect Google account information
-- We do NOT collect Zoom account information
-- We do NOT transmit any data to external servers
+- Meeting audio/video/chat content
+- Google account credentials
+- Zoom account credentials (credentials are entered directly into Zoom pages)
+- Browsing history outside required pages
 
-## No External Services
+## Local and Third-Party Traffic
 
-Unlike the previous version that used Zoom's OAuth API, this extension:
-
-- Does NOT connect to Zoom's API servers
-- Does NOT require OAuth authentication
-- Does NOT store authentication tokens
-- Does NOT communicate with any cloud services
-
-All Zoom control happens locally via Hammerspoon's accessibility APIs.
-
-## Third-Party Services
-
-### Google Meet
-
-The extension runs a content script on Google Meet pages (`meet.google.com`) solely to detect meeting join/leave events. It does NOT:
-- Access your Google account
-- Read meeting content
-- Record any meeting data
-
-### Hammerspoon
-
-The extension communicates with Hammerspoon via `localhost:17394`. Hammerspoon is a separate macOS application that runs locally on your machine. This communication:
-- Never leaves your computer
-- Is not encrypted (localhost only)
-- Contains only simple commands (join/leave status)
-
-## Data Storage
-
-All data is stored locally using Chrome's built-in storage APIs:
-
-- **`chrome.storage.local`**: Stores meeting state and settings
-- Data is encrypted by Chrome and only accessible by this extension
-- No data is synced to any external servers
-
-### Data Retention
-
-- Meeting state is cleared when you leave all meetings
-- All data is deleted when you uninstall the extension
+- Extension <-> Zoom Automator traffic is local (`localhost`) only.
+- Zoom Automator communicates with Zoom web endpoints (`app.zoom.us`) to sign in and run meetings.
+- This is required for Zoom functionality and uses your own Zoom account session.
 
 ## Permissions
 
-The extension requests these Chrome permissions:
+The extension requests:
 
 | Permission | Reason |
 |------------|--------|
-| `storage` | Store meeting state and extension settings |
-| `tabs` | Detect when Google Meet tabs are closed |
-| `activeTab` | Access Google Meet page content |
-| `notifications` | Show error notifications to user |
-| `host_permissions` for meet.google.com | Run content script to detect meetings |
-| `host_permissions` for localhost:17394 | Communicate with local Hammerspoon server |
+| `storage` | Persist meeting state |
+| `tabs` | Handle tab close/navigation state |
+| `activeTab` | Operate on active Meet tabs |
+| `host_permissions` for `https://meet.google.com/*` | Detect Meet join/leave |
+| `host_permissions` for `http://localhost:17394/*` | Call local Zoom Automator |
 
-Note: We do NOT request the `identity` permission (no OAuth needed).
+## Data Retention
 
-## Security
+- Extension state persists locally until cleared or extension uninstall.
+- Zoom web profile data persists locally until you delete the profile directory or sign out.
 
-- All communication is local (localhost only)
-- No external API calls
-- No authentication tokens stored
-- Hammerspoon accessibility permissions are controlled by macOS
+## Security Notes
 
-## Your Rights
+- Localhost traffic is unencrypted by default but does not leave your machine.
+- Access to local profile data is governed by your OS account permissions.
 
-You can:
-- **View data**: Use Chrome's developer tools to inspect stored data
-- **Delete data**: Uninstall the extension to remove all stored data
-- **Revoke access**: Disable the extension at any time
+## Your Controls
 
-## Children's Privacy
-
-This extension is not directed at children under 13 and does not collect data from anyone.
-
-## Changes to This Policy
-
-If we make material changes to this privacy policy, we will update the "Last Updated" date and may notify users through the extension update notes.
+- Disable/uninstall extension at any time.
+- Stop the local Zoom Automator server at any time.
+- Delete local profile/session files at any time.
 
 ## Contact
 
-If you have questions about this privacy policy, please:
-- Open an issue on the [GitHub repository](https://github.com/yourusername/google-meet-zoom-status)
-
-## Open Source
-
-This extension is open source. You can review the complete source code at:
-[https://github.com/yourusername/google-meet-zoom-status](https://github.com/yourusername/google-meet-zoom-status)
+For issues or questions, open an issue in the project repository.

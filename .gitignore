@@ -1,37 +1,47 @@
-# Dependencies
-node_modules/
+# dependencies
+node_modules
+packages/*/node_modules
 
-# Build output
-dist/
-release/
+# output
+out
+dist
+release
+bin
+packages/*/dist
+packages/*/release
+*.tgz
 
-# Environment files
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+*.log
+report.*.*.*.*.json
+
+# dotenv environment variable files
 .env
+.env.development.local
+.env.test.local
+.env.production.local
 .env.local
-.env.*.local
+.env.zoom
+.env.zoom.local
+packages/extension/src/config.ts
 
-# Config with secrets (use config.example.ts as template)
-src/config.ts
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
 
 # IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+.idea
+.vscode
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Debug logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Package manager lock files (keeping package-lock.json)
-yarn.lock
-pnpm-lock.yaml
+# playwright data folder
+/packages/server/data/

@@ -1,16 +1,16 @@
 /**
  * Background service worker entry point
- * Handles Zoom status updates via Hammerspoon and meeting state management
+ * Handles Zoom status updates via Zoom Automator and meeting state management
  */
 
 import type { ExtensionMessage, MeetingStateResponse } from '../types';
 import {
-  setInMeeting as hammerspoonSetInMeeting,
-  clearMeeting as hammerspoonClearMeeting,
-  isAvailable as isHammerspoonAvailable,
-  getStatus as getHammerspoonStatus,
-  HammerspoonError,
-} from './hammerspoon-api';
+  setInMeeting as zoomAutomatorSetInMeeting,
+  clearMeeting as zoomAutomatorClearMeeting,
+  isAvailable as isZoomAutomatorAvailable,
+  getStatus as getZoomAutomatorStatus,
+  ZoomAutomatorError,
+} from './zoom-automator-api';
 import {
   addMeetingTab,
   removeMeetingTab,
@@ -30,7 +30,7 @@ logger.info('Service worker started');
 type BadgeState = 'disconnected' | 'connected' | 'in_meeting';
 
 const BADGE_COLORS: Record<BadgeState, string> = {
-  disconnected: '#808080', // Gray - Hammerspoon not available
+  disconnected: '#808080', // Gray - Zoom Automator not available
   connected: '#22C55E',    // Green - Ready
   in_meeting: '#EF4444',   // Red - In meeting
 };
@@ -45,10 +45,10 @@ const BADGE_TEXT: Record<BadgeState, string> = {
  * Update the extension badge to reflect current state
  */
 async function updateBadge(): Promise<void> {
-  const hammerspoonAvailable = await isHammerspoonAvailable();
+  const automatorAvailable = await isZoomAutomatorAvailable();
   
   let state: BadgeState;
-  if (!hammerspoonAvailable) {
+  if (!automatorAvailable) {
     state = 'disconnected';
   } else {
     const inMeeting = await hasActiveMeetings();
@@ -66,31 +66,31 @@ async function updateBadge(): Promise<void> {
 // ============================================
 
 /**
- * Update Zoom status using Hammerspoon
+ * Update Zoom status using Zoom Automator
  */
 async function updateZoomStatus(joining: boolean): Promise<{ success: boolean; error?: string }> {
-  const hammerspoonAvailable = await isHammerspoonAvailable();
+  const automatorAvailable = await isZoomAutomatorAvailable();
   
-  if (!hammerspoonAvailable) {
-    logger.warn('Hammerspoon not available - ensure Hammerspoon is running');
+  if (!automatorAvailable) {
+    logger.warn('Zoom Automator not available - ensure the Bun server is running');
     return { 
       success: false, 
-      error: 'Hammerspoon not running. Please start Hammerspoon.' 
+      error: 'Zoom Automator not running. Start the local Bun server.' 
     };
   }
 
   try {
     if (joining) {
-      await hammerspoonSetInMeeting();
-      logger.info('Zoom status set: Busy + "In Google Meet"');
+      await zoomAutomatorSetInMeeting();
+      logger.info('Zoom status set via automation meeting');
     } else {
-      await hammerspoonClearMeeting();
-      logger.info('Zoom status cleared: Available');
+      await zoomAutomatorClearMeeting();
+      logger.info('Zoom status cleared via automation meeting end');
     }
     return { success: true };
   } catch (error) {
-    if (error instanceof HammerspoonError) {
-      logger.error(`Hammerspoon error (${error.code}): ${error.message}`);
+    if (error instanceof ZoomAutomatorError) {
+      logger.error(`Zoom Automator error (${error.code}): ${error.message}`);
       return { success: false, error: error.message };
     }
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -215,17 +215,17 @@ async function handleWindowClosed(windowId: number): Promise<void> {
 // Message Handler
 // ============================================
 
-interface HammerspoonStatusResponse {
+interface ZoomAutomatorStatusResponse {
   isConnected: boolean;
   zoomStatus?: string;
 }
 
-async function handleGetHammerspoonStatus(): Promise<HammerspoonStatusResponse> {
-  const isConnected = await isHammerspoonAvailable();
+async function handleGetZoomAutomatorStatus(): Promise<ZoomAutomatorStatusResponse> {
+  const isConnected = await isZoomAutomatorAvailable();
   let zoomStatus: string | undefined;
   
   if (isConnected) {
-    zoomStatus = await getHammerspoonStatus() ?? undefined;
+    zoomStatus = (await getZoomAutomatorStatus()) ?? undefined;
   }
   
   return { isConnected, zoomStatus };
@@ -253,8 +253,8 @@ async function handleMessage(message: ExtensionMessage, sender: chrome.runtime.M
       };
       return stateResponse;
 
-    case 'GET_HAMMERSPOON_STATUS':
-      return handleGetHammerspoonStatus();
+    case 'GET_ZOOM_AUTOMATOR_STATUS':
+      return handleGetZoomAutomatorStatus();
 
     default:
       logger.warn('Unknown message type:', message);
@@ -300,12 +300,12 @@ async function initialize(): Promise<void> {
     // Update badge to reflect current state
     await updateBadge();
 
-    // Check Hammerspoon availability
-    const hammerspoonAvailable = await isHammerspoonAvailable();
-    if (hammerspoonAvailable) {
-      logger.info('Hammerspoon connection established');
+    // Check Zoom Automator availability
+    const automatorAvailable = await isZoomAutomatorAvailable();
+    if (automatorAvailable) {
+      logger.info('Zoom Automator connection established');
     } else {
-      logger.warn('Hammerspoon not available - status updates will not work');
+      logger.warn('Zoom Automator not available - status updates will not work');
     }
 
     logger.info('Service worker initialized successfully');

@@ -15,7 +15,7 @@ export type ExtensionMessage =
   | { type: 'MEETING_JOINED'; meetingId?: string; tabId: number }
   | { type: 'MEETING_LEFT'; tabId: number }
   | { type: 'GET_MEETING_STATE' }
-  | { type: 'GET_HAMMERSPOON_STATUS' };
+  | { type: 'GET_ZOOM_AUTOMATOR_STATUS' };
 
 // Response types for messages
 export interface MeetingStateResponse {
@@ -23,7 +23,7 @@ export interface MeetingStateResponse {
   meetingId?: string;
 }
 
-export interface HammerspoonStatusResponse {
+export interface ZoomAutomatorStatusResponse {
   isConnected: boolean;
   zoomStatus?: string;
 }

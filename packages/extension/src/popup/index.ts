@@ -3,7 +3,11 @@
  * Handles popup UI interactions and state display
  */
 
-import type { ExtensionMessage, MeetingStateResponse, HammerspoonStatusResponse } from '../types';
+import type {
+  ExtensionMessage,
+  MeetingStateResponse,
+  ZoomAutomatorStatusResponse,
+} from '../types';
 import { popupLogger as logger } from '../utils/logger';
 
 logger.info('Popup script loaded');
@@ -13,9 +17,9 @@ logger.info('Popup script loaded');
 // ============================================
 
 interface PopupElements {
-  hammerspoonStatusCard: HTMLElement | null;
-  hammerspoonIndicator: HTMLElement | null;
-  hammerspoonStatusText: HTMLElement | null;
+  automatorStatusCard: HTMLElement | null;
+  automatorIndicator: HTMLElement | null;
+  automatorStatusText: HTMLElement | null;
   
   meetingStatusCard: HTMLElement | null;
   meetingIndicator: HTMLElement | null;
@@ -26,9 +30,9 @@ interface PopupElements {
 
 function getElements(): PopupElements {
   return {
-    hammerspoonStatusCard: document.getElementById('hammerspoon-status-card'),
-    hammerspoonIndicator: document.getElementById('hammerspoon-indicator'),
-    hammerspoonStatusText: document.getElementById('hammerspoon-status-text'),
+    automatorStatusCard: document.getElementById('automator-status-card'),
+    automatorIndicator: document.getElementById('automator-indicator'),
+    automatorStatusText: document.getElementById('automator-status-text'),
     
     meetingStatusCard: document.getElementById('meeting-status-card'),
     meetingIndicator: document.getElementById('meeting-indicator'),
@@ -43,13 +47,13 @@ function getElements(): PopupElements {
 // ============================================
 
 interface PopupState {
-  isHammerspoonConnected: boolean;
+  isAutomatorConnected: boolean;
   isInMeeting: boolean;
   zoomStatus: string | null;
 }
 
 const state: PopupState = {
-  isHammerspoonConnected: false,
+  isAutomatorConnected: false,
   isInMeeting: false,
   zoomStatus: null,
 };
@@ -61,20 +65,20 @@ const state: PopupState = {
 function updateUI(): void {
   const elements = getElements();
   
-  // Update Hammerspoon connection status
-  if (elements.hammerspoonStatusCard && elements.hammerspoonIndicator && elements.hammerspoonStatusText) {
-    if (state.isHammerspoonConnected) {
-      elements.hammerspoonStatusCard.classList.add('connected');
-      elements.hammerspoonStatusCard.classList.remove('disconnected');
-      elements.hammerspoonIndicator.classList.add('connected');
-      elements.hammerspoonIndicator.classList.remove('disconnected');
-      elements.hammerspoonStatusText.textContent = 'Connected';
+  // Update Zoom Automator connection status
+  if (elements.automatorStatusCard && elements.automatorIndicator && elements.automatorStatusText) {
+    if (state.isAutomatorConnected) {
+      elements.automatorStatusCard.classList.add('connected');
+      elements.automatorStatusCard.classList.remove('disconnected');
+      elements.automatorIndicator.classList.add('connected');
+      elements.automatorIndicator.classList.remove('disconnected');
+      elements.automatorStatusText.textContent = 'Connected';
     } else {
-      elements.hammerspoonStatusCard.classList.remove('connected');
-      elements.hammerspoonStatusCard.classList.add('disconnected');
-      elements.hammerspoonIndicator.classList.remove('connected');
-      elements.hammerspoonIndicator.classList.add('disconnected');
-      elements.hammerspoonStatusText.textContent = 'Not running';
+      elements.automatorStatusCard.classList.remove('connected');
+      elements.automatorStatusCard.classList.add('disconnected');
+      elements.automatorIndicator.classList.remove('connected');
+      elements.automatorIndicator.classList.add('disconnected');
+      elements.automatorStatusText.textContent = 'Not running';
     }
   }
   
@@ -97,7 +101,7 @@ function updateUI(): void {
   if (elements.zoomStatusText) {
     if (state.zoomStatus) {
       elements.zoomStatusText.textContent = state.zoomStatus;
-    } else if (state.isHammerspoonConnected) {
+    } else if (state.isAutomatorConnected) {
       elements.zoomStatusText.textContent = 'Unknown';
     } else {
       elements.zoomStatusText.textContent = '-';
@@ -121,15 +125,17 @@ async function sendMessage<T>(message: ExtensionMessage): Promise<T> {
   });
 }
 
-async function fetchHammerspoonStatus(): Promise<void> {
+async function fetchZoomAutomatorStatus(): Promise<void> {
   try {
-    const response = await sendMessage<HammerspoonStatusResponse>({ type: 'GET_HAMMERSPOON_STATUS' });
-    state.isHammerspoonConnected = response.isConnected;
+    const response = await sendMessage<ZoomAutomatorStatusResponse>({
+      type: 'GET_ZOOM_AUTOMATOR_STATUS',
+    });
+    state.isAutomatorConnected = response.isConnected;
     state.zoomStatus = response.zoomStatus ?? null;
-    logger.debug('Hammerspoon status:', response);
+    logger.debug('Zoom Automator status:', response);
   } catch (error) {
-    logger.error('Failed to get Hammerspoon status', error);
-    state.isHammerspoonConnected = false;
+    logger.error('Failed to get Zoom Automator status', error);
+    state.isAutomatorConnected = false;
     state.zoomStatus = null;
   }
 }
@@ -147,7 +153,7 @@ async function fetchMeetingStatus(): Promise<void> {
 
 async function refreshStatus(): Promise<void> {
   await Promise.all([
-    fetchHammerspoonStatus(),
+    fetchZoomAutomatorStatus(),
     fetchMeetingStatus(),
   ]);
   updateUI();
@@ -193,9 +199,9 @@ async function initialize(): Promise<void> {
   setupEventListeners();
   await refreshStatus();
   
-  // Periodically refresh Hammerspoon status
+  // Periodically refresh Zoom Automator status
   setInterval(() => {
-    fetchHammerspoonStatus().then(updateUI);
+    fetchZoomAutomatorStatus().then(updateUI);
   }, 5000);
   
   logger.info('Initialization complete');
