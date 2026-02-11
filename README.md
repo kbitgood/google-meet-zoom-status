@@ -57,7 +57,7 @@ Alright, let's get you set up. I'll assume you're relatively new to this stuff.
 
 You'll need:
 - A Mac (this hasn't been tested on Windows/Linux)
-- Google Chrome
+- A Chromium-based browser (Chrome, Edge, Arc, Brave, Vivaldi, Opera, etc.)
 - A terminal (you'll find this in Applications > Utilities > Terminal)
 
 ### Step 1: Get the Code
