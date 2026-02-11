@@ -50,10 +50,30 @@ bunx playwright install chromium
 
 ## One-time auth flow
 
-Start server:
+Start server (foreground):
 
 ```bash
 bun run server:dev
+```
+
+Or run it in the background with `nohup`:
+
+```bash
+nohup bun run server:dev > /tmp/zoom-automator-server.log 2>&1 &
+echo $! > /tmp/zoom-automator-server.pid
+```
+
+Check logs / health when running in background:
+
+```bash
+tail -f /tmp/zoom-automator-server.log
+curl http://127.0.0.1:17394/health
+```
+
+Stop the background server:
+
+```bash
+kill "$(cat /tmp/zoom-automator-server.pid)"
 ```
 
 Then bootstrap login:
@@ -74,4 +94,16 @@ Build extension:
 bun run build
 ```
 
-Load unpacked extension from `packages/extension/dist` in `chrome://extensions`.
+Install (side-load) in Chrome:
+
+1. Open `chrome://extensions`.
+2. Enable `Developer mode` (top-right toggle).
+3. Click `Load unpacked`.
+4. Select `/Users/kenneth/Projects/google-meet-zoom-status/packages/extension/dist`.
+5. Confirm the extension appears in the extensions list.
+
+After code changes, rebuild and click `Reload` on the extension card:
+
+```bash
+bun run build
+```

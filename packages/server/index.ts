@@ -2,10 +2,13 @@ import { ZoomAutomator } from './zoom-automator';
 
 const PORT = Number.parseInt(process.env.ZOOM_AUTOMATOR_PORT ?? '17394', 10);
 const DATA_DIR = process.env.ZOOM_AUTOMATOR_DATA_DIR;
-const IDLE_TIMEOUT_SECONDS = Number.parseInt(
+const RAW_IDLE_TIMEOUT_SECONDS = Number.parseInt(
   process.env.ZOOM_AUTOMATOR_IDLE_TIMEOUT_SECONDS ?? '600',
   10
 );
+const IDLE_TIMEOUT_SECONDS = Number.isFinite(RAW_IDLE_TIMEOUT_SECONDS)
+  ? Math.max(1, Math.min(255, RAW_IDLE_TIMEOUT_SECONDS))
+  : 120;
 
 const automator = new ZoomAutomator(DATA_DIR);
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Zoom Automator E2E Testing"
+  short_description: "Step-by-step local API and Zoom presence verification"
+  default_prompt: "Run the Zoom Automator proof-of-concept test step-by-step with log capture and direct Zoom API verification."
